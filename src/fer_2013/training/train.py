@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -196,7 +197,11 @@ def fit(
 
     writer: SummaryWriter | None = None
     if config.tensorboard.enabled:
-        run_dir = config.tensorboard.log_dir / config.tensorboard.run_name
+        run_dir = (
+            config.tensorboard.log_dir
+            / config.tensorboard.run_name
+            / datetime.now().strftime("%Y%m%d_%H%M%S")
+        )
         writer = SummaryWriter(log_dir=str(run_dir))
         log.info("tensorboard: %s", run_dir)
 

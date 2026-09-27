@@ -20,6 +20,7 @@ requires-python = ">=3.12"
      "pydantic>=2.7.0",
      "pyyaml>=6.0.0",
      "tensorboard>=2.17.0",
+     "grad-cam>=1.5.0",
  ]
 
 [project.scripts]
@@ -97,6 +98,7 @@ module = [
     "torchvision.*",
     "seaborn.*",
     "sklearn.*",
+    "pytorch_grad_cam.*",
 ]
 ignore_missing_imports = true
 
