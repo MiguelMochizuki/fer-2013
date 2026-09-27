@@ -1,7 +1,7 @@
 [project]
 name = "fer-2013"
 version = "0.1.0"
-description = "Add your description here"
+description = "End-to-end data analysis and deep learning pipeline for FER-2013"
 readme = "README.md"
 authors = [
     { name = "MiguelMochizuki", email = "miguelmochizukisilva@gmail.com" }
@@ -31,6 +31,8 @@ dev = [
     "mypy>=1.13.0",
     "pandas-stubs>=2.2.0",
     "pre-commit>=4.0.0",
+    "jupyterlab>=4.0.0",
+    "ipykernel>=6.29.0",
 ]
 
 [build-system]
@@ -90,10 +92,6 @@ module = [
     "seaborn.*",
 ]
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
 
 # ==============================
 # Pytest
