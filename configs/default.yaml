@@ -1,0 +1,24 @@
+# Training configuration for FER-2013 ResNet18.
+
+data:
+  processed_dir: data/processed
+  batch_size: 64
+  num_workers: 4
+
+model:
+  num_classes: 7
+  pretrained: true
+
+training:
+  epochs: 30
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  early_stopping_patience: 5
+  early_stopping_metric: macro_f1     # macro_f1 | loss
+  early_stopping_mode: max            # max | min
+  seed: 42
+
+checkpoint:
+  dir: checkpoints
+  save_best: true
+  save_last: true
