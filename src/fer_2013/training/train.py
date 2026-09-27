@@ -25,7 +25,6 @@ from fer_2013.training.config import Config
 
 log = logging.getLogger(__name__)
 
-LABEL_SMOOTHING = 0.1
 DEFAULT_REPORTS_DIR = Path("reports")
 
 
@@ -213,9 +212,7 @@ def fit(
 
     if class_weights is not None:
         class_weights = class_weights.to(device)
-    criterion = nn.CrossEntropyLoss(
-        weight=class_weights, label_smoothing=LABEL_SMOOTHING
-    )
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
 
     optimizer = AdamW(
         model.parameters(),
@@ -344,7 +341,6 @@ def fit(
 
 __all__ = [
     "DEFAULT_REPORTS_DIR",
-    "LABEL_SMOOTHING",
     "TrainHistory",
     "evaluate",
     "fit",
