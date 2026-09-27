@@ -19,7 +19,7 @@ from fer_2013.models.cnn import (
 
 @pytest.fixture
 def model() -> ResNet:
-    """Fresh, untrained ResNet18 with 7-class head per test."""
+    """Fresh, untrained ResNet18 with dropout + 7-class head per test."""
     return build_resnet18(pretrained=False)
 
 
@@ -36,15 +36,23 @@ def test_output_shape(model: ResNet) -> None:
 
 
 def test_head_is_fresh(model: ResNet) -> None:
-    """The fc layer must be a fresh Linear(512, 7), not the ImageNet 1000-class one."""
-    assert isinstance(model.fc, nn.Linear)
-    assert model.fc.in_features == FEATURE_DIM
-    assert model.fc.out_features == NUM_CLASSES
+    """The head must be Dropout + Linear(512, 7), not the ImageNet 1000-class one."""
+    fc = model.fc
+    assert isinstance(fc, nn.Sequential)
+    assert isinstance(fc[0], nn.Dropout)
+    linear = fc[-1]
+    assert isinstance(linear, nn.Linear)
+    assert linear.in_features == FEATURE_DIM
+    assert linear.out_features == NUM_CLASSES
 
 
 def test_num_classes_is_configurable() -> None:
     m = build_resnet18(num_classes=3, pretrained=False)
-    assert m.fc.out_features == 3
+    fc = m.fc
+    assert isinstance(fc, nn.Sequential)
+    linear = fc[-1]
+    assert isinstance(linear, nn.Linear)
+    assert linear.out_features == 3
     x = torch.randn(1, 3, 224, 224)
     with torch.no_grad():
         out = m(x)
@@ -55,6 +63,14 @@ def test_pretrained_false_skips_download() -> None:
     """No network access; must succeed offline."""
     m = build_resnet18(pretrained=False)
     assert isinstance(m, nn.Module)
+
+
+def test_dropout_is_configurable() -> None:
+    m = build_resnet18(pretrained=False, dropout=0.2)
+    fc = m.fc
+    assert isinstance(fc, nn.Sequential)
+    assert isinstance(fc[0], nn.Dropout)
+    assert fc[0].p == 0.2
 
 
 # ==============================
@@ -94,7 +110,6 @@ def test_freeze_backbone_reduces_trainable_params(model: ResNet) -> None:
     freeze_backbone(model)
     frozen = count_trainable_params(model)
     assert frozen < total
-    # Only fc (512*7 + 7) plus BN params should be trainable.
     assert frozen < total / 4  # sanity: at least 4x reduction
 
 

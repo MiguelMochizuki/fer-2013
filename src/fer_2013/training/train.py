@@ -6,6 +6,7 @@ Early stopping on validation macro-F1 (default) to counter class imbalance.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -23,6 +24,8 @@ from torch.utils.tensorboard import SummaryWriter
 from fer_2013.training.config import Config
 
 log = logging.getLogger(__name__)
+
+LABEL_SMOOTHING = 0.1
 
 
 @dataclass
@@ -163,6 +166,28 @@ def save_checkpoint(
     )
 
 
+def save_history(history: TrainHistory, reports_dir: Path) -> Path:
+    """Dump the training history to a timestamped JSON file."""
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    path = reports_dir / f"history_{datetime.now():%Y%m%d_%H%M%S}.json"
+    path.write_text(
+        json.dumps(
+            {
+                "train_loss": history.train_loss,
+                "train_acc": history.train_acc,
+                "train_f1": history.train_f1,
+                "val_loss": history.val_loss,
+                "val_acc": history.val_acc,
+                "val_f1": history.val_f1,
+                "best_epoch": history.best_epoch,
+                "best_val_score": history.best_val_score,
+            },
+            indent=2,
+        )
+    )
+    return path
+
+
 def _score_is_better(new: float, best: float, mode: str) -> bool:
     if mode == "max":
         return new > best
@@ -177,7 +202,7 @@ def fit(
     *,
     class_weights: torch.Tensor | None = None,
 ) -> TrainHistory:
-    """Run the training loop. Saves best + last checkpoints."""
+    """Run the training loop. Saves best + last checkpoints and history."""
     tcfg = config.training
     n_classes = config.model.num_classes
     torch.manual_seed(tcfg.seed)
@@ -186,7 +211,9 @@ def fit(
 
     if class_weights is not None:
         class_weights = class_weights.to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    criterion = nn.CrossEntropyLoss(
+        weight=class_weights, label_smoothing=LABEL_SMOOTHING
+    )
 
     optimizer = AdamW(
         model.parameters(),
@@ -307,13 +334,18 @@ def fit(
         if writer is not None:
             writer.close()
 
+    history_path = save_history(history, Path("reports"))
+    log.info("history: %s", history_path)
+
     return history
 
 
 __all__ = [
+    "LABEL_SMOOTHING",
     "TrainHistory",
     "evaluate",
     "fit",
     "save_checkpoint",
+    "save_history",
     "train_one_epoch",
 ]

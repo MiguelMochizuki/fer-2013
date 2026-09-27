@@ -16,6 +16,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import torch
@@ -27,6 +28,12 @@ from fer_2013.evaluation.evaluate import (
     load_checkpoint,
     per_class_report,
     predict,
+)
+from fer_2013.evaluation.plots import (
+    HistoryDict,
+    plot_confusion_matrix,
+    plot_pr_curves,
+    plot_training_curves,
 )
 from fer_2013.models.cnn import build_resnet18
 
@@ -40,12 +47,29 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument(
+        "--history",
+        type=Path,
+        default=None,
+        help="Path to a history_*.json from training. If omitted, uses the newest "
+        "in --reports-dir.",
+    )
+    parser.add_argument(
         "--no-save-arrays",
         action="store_true",
         help="Skip saving preds/targets/probs .npy files.",
     )
+    parser.add_argument(
+        "--no-plots",
+        action="store_true",
+        help="Skip generating PNG plots.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
+
+
+def _find_latest_history(reports_dir: Path) -> Path | None:
+    candidates = sorted(reports_dir.glob("history_*.json"))
+    return candidates[-1] if candidates else None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     print()
 
     args.reports_dir.mkdir(parents=True, exist_ok=True)
+
     metrics_path = args.reports_dir / f"{args.split}_metrics.json"
     with metrics_path.open("w") as f:
         json.dump(
@@ -113,6 +138,33 @@ def main(argv: list[str] | None = None) -> int:
         np.save(args.reports_dir / f"{args.split}_targets.npy", preds.targets)
         np.save(args.reports_dir / f"{args.split}_probs.npy", preds.probs)
         log.info("saved prediction arrays to %s", args.reports_dir)
+
+    if not args.no_plots:
+        log.info(
+            "wrote %s",
+            plot_confusion_matrix(
+                metrics.confusion,
+                args.reports_dir / f"{args.split}_confusion.png",
+            ),
+        )
+        log.info(
+            "wrote %s",
+            plot_pr_curves(
+                preds.probs,
+                preds.targets,
+                args.reports_dir / f"{args.split}_pr_curves.png",
+            ),
+        )
+
+        history_path = args.history or _find_latest_history(args.reports_dir)
+        if history_path is not None and history_path.exists():
+            history = cast(HistoryDict, json.loads(history_path.read_text()))
+            log.info(
+                "wrote %s",
+                plot_training_curves(history, args.reports_dir / "training_curves.png"),
+            )
+        else:
+            log.warning("no history file found; skipping training curves")
 
     return 0
 
