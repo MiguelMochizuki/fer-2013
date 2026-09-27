@@ -26,6 +26,7 @@ from fer_2013.training.config import Config
 log = logging.getLogger(__name__)
 
 LABEL_SMOOTHING = 0.1
+DEFAULT_REPORTS_DIR = Path("reports")
 
 
 @dataclass
@@ -201,6 +202,7 @@ def fit(
     config: Config,
     *,
     class_weights: torch.Tensor | None = None,
+    reports_dir: Path = DEFAULT_REPORTS_DIR,
 ) -> TrainHistory:
     """Run the training loop. Saves best + last checkpoints and history."""
     tcfg = config.training
@@ -334,13 +336,14 @@ def fit(
         if writer is not None:
             writer.close()
 
-    history_path = save_history(history, Path("reports"))
+    history_path = save_history(history, reports_dir)
     log.info("history: %s", history_path)
 
     return history
 
 
 __all__ = [
+    "DEFAULT_REPORTS_DIR",
     "LABEL_SMOOTHING",
     "TrainHistory",
     "evaluate",

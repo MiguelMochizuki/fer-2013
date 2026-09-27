@@ -15,6 +15,7 @@ from fer_2013.training.config import (
     Config,
     DataConfig,
     ModelConfig,
+    TensorBoardConfig,
     TrainingConfig,
 )
 from fer_2013.training.train import (
@@ -68,8 +69,13 @@ def _make_config(
     patience: int = 10,
     metric: Literal["macro_f1", "loss"] = "macro_f1",
     mode: Literal["max", "min"] = "max",
+    tensorboard_enabled: bool = False,
 ) -> Config:
-    """Build a minimal Config suitable for tests."""
+    """Build a minimal Config suitable for tests.
+
+    TensorBoard is disabled by default so tests don't write to ./runs.
+    Tests that exercise it opt in and point log_dir at tmp_path.
+    """
     return Config(
         data=DataConfig(batch_size=8, num_workers=0),
         model=ModelConfig(num_classes=7, pretrained=False),
@@ -81,6 +87,11 @@ def _make_config(
             early_stopping_mode=mode,
         ),
         checkpoint=CheckpointConfig(dir=tmp_path / "ckpt"),
+        tensorboard=TensorBoardConfig(
+            enabled=tensorboard_enabled,
+            log_dir=tmp_path / "runs",
+            run_name="test",
+        ),
     )
 
 
@@ -183,7 +194,9 @@ def test_fit_runs_and_returns_history(
     train_loader, val_loader = tiny_loaders
     model = TinyNet()
     config = _make_config(tmp_path, epochs=3)
-    history = fit(model, train_loader, val_loader, config)
+    history = fit(
+        model, train_loader, val_loader, config, reports_dir=tmp_path / "reports"
+    )
     assert isinstance(history, TrainHistory)
     assert len(history.train_loss) == 3
     assert len(history.val_loss) == 3
@@ -191,6 +204,7 @@ def test_fit_runs_and_returns_history(
     assert history.best_val_score > float("-inf")
     assert (tmp_path / "ckpt" / "best.pt").exists()
     assert (tmp_path / "ckpt" / "last.pt").exists()
+    assert any((tmp_path / "reports").glob("history_*.json"))
 
 
 def test_fit_early_stops(
@@ -201,7 +215,9 @@ def test_fit_early_stops(
     train_loader, val_loader = tiny_loaders
     model = TinyNet()
     config = _make_config(tmp_path, epochs=20, lr=1e-12, patience=1)
-    history = fit(model, train_loader, val_loader, config)
+    history = fit(
+        model, train_loader, val_loader, config, reports_dir=tmp_path / "reports"
+    )
     assert len(history.train_loss) < 5
 
 
@@ -213,7 +229,14 @@ def test_fit_accepts_class_weights(
     model = TinyNet()
     config = _make_config(tmp_path, epochs=1)
     weights = torch.ones(7)
-    history = fit(model, train_loader, val_loader, config, class_weights=weights)
+    history = fit(
+        model,
+        train_loader,
+        val_loader,
+        config,
+        class_weights=weights,
+        reports_dir=tmp_path / "reports",
+    )
     assert len(history.train_loss) == 1
 
 
@@ -225,9 +248,24 @@ def test_fit_can_stop_on_loss(
     train_loader, val_loader = tiny_loaders
     model = TinyNet()
     config = _make_config(tmp_path, epochs=2, metric="loss", mode="min", patience=5)
-    history = fit(model, train_loader, val_loader, config)
+    history = fit(
+        model, train_loader, val_loader, config, reports_dir=tmp_path / "reports"
+    )
     assert len(history.train_loss) == 2
     assert history.best_val_score < float("inf")
+
+
+def test_fit_writes_history_json(
+    tiny_loaders: tuple[Loader, Loader],
+    tmp_path: Path,
+) -> None:
+    train_loader, val_loader = tiny_loaders
+    model = TinyNet()
+    config = _make_config(tmp_path, epochs=1)
+    reports_dir = tmp_path / "reports"
+    fit(model, train_loader, val_loader, config, reports_dir=reports_dir)
+    files = list(reports_dir.glob("history_*.json"))
+    assert len(files) == 1
 
 
 def test_fit_writes_tensorboard_logs(
@@ -237,43 +275,7 @@ def test_fit_writes_tensorboard_logs(
     """TensorBoard log dir must be created when enabled."""
     train_loader, val_loader = tiny_loaders
     model = TinyNet()
-    config = _make_config(tmp_path, epochs=1)
-    # _make_config leaves tensorboard at defaults (enabled=True, log_dir=runs)
-    # Override to use tmp_path so we don't pollute the repo.
-    config = config.model_copy(
-        update={
-            "tensorboard": config.tensorboard.model_copy(
-                update={"log_dir": tmp_path / "runs"}
-            )
-        }
-    )
-    fit(model, train_loader, val_loader, config)
+    config = _make_config(tmp_path, epochs=1, tensorboard_enabled=True)
+    fit(model, train_loader, val_loader, config, reports_dir=tmp_path / "reports")
     assert (tmp_path / "runs").exists()
-    assert any((tmp_path / "runs").iterdir())
-
-
-def test_train_one_epoch_logs_batches(
-    tiny_loaders: tuple[Loader, Loader],
-    tmp_path: Path,
-) -> None:
-    """When a writer is passed, batch scalars are logged."""
-    from torch.utils.tensorboard import SummaryWriter
-
-    train_loader, _ = tiny_loaders
-    model = TinyNet()
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-    writer = SummaryWriter(log_dir=str(tmp_path / "tb"))
-    try:
-        train_one_epoch(
-            model,
-            train_loader,
-            criterion,
-            optimizer,
-            torch.device("cpu"),
-            writer=writer,
-        )
-    finally:
-        writer.close()
-    assert (tmp_path / "tb").exists()
-    assert any((tmp_path / "tb").iterdir())
+    assert any((tmp_path / "runs").rglob("events.out.tfevents.*"))
