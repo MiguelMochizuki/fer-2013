@@ -56,11 +56,18 @@ class CheckpointConfig(_StrictBase):
     save_last: bool = True
 
 
+class TensorBoardConfig(_StrictBase):
+    enabled: bool = True
+    log_dir: Path = Path("runs")
+    run_name: str = "fer2013_resnet18"
+
+
 class Config(_StrictBase):
     data: DataConfig = Field(default_factory=DataConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
+    tensorboard: TensorBoardConfig = Field(default_factory=TensorBoardConfig)
 
     @property
     def device(self) -> str:
@@ -81,6 +88,7 @@ __all__ = [
     "Config",
     "DataConfig",
     "ModelConfig",
+    "TensorBoardConfig",
     "TrainingConfig",
     "load_config",
 ]

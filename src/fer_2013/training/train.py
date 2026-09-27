@@ -17,6 +17,7 @@ from torch import nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from fer_2013.training.config import Config
 
@@ -29,6 +30,7 @@ class TrainHistory:
 
     train_loss: list[float] = field(default_factory=list)
     train_acc: list[float] = field(default_factory=list)
+    train_f1: list[float] = field(default_factory=list)
     val_loss: list[float] = field(default_factory=list)
     val_acc: list[float] = field(default_factory=list)
     val_f1: list[float] = field(default_factory=list)
@@ -37,20 +39,42 @@ class TrainHistory:
     best_val_loss: float = float("inf")
 
 
+def _macro_f1(preds: np.ndarray, targets: np.ndarray, n_classes: int) -> float:
+    return float(
+        f1_score(
+            targets,
+            preds,
+            average="macro",
+            labels=list(range(n_classes)),
+            zero_division=0,
+        )
+    )
+
+
 def train_one_epoch(
     model: nn.Module,
     loader: DataLoader[tuple[torch.Tensor, torch.Tensor]],
     criterion: nn.Module,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
-) -> tuple[float, float]:
-    """Run one training epoch. Returns (mean_loss, accuracy)."""
+    *,
+    n_classes: int = 7,
+    writer: SummaryWriter | None = None,
+    global_step: int = 0,
+) -> tuple[float, float, float, int]:
+    """Run one training epoch.
+
+    Returns:
+        (mean_loss, accuracy, macro_f1, updated_global_step)
+    """
     model.train()
     running_loss = 0.0
     running_correct = 0
     total = 0
+    all_preds: list[np.ndarray] = []
+    all_targets: list[np.ndarray] = []
 
-    for x, y in loader:
+    for batch_idx, (x, y) in enumerate(loader):
         x = x.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
 
@@ -60,11 +84,28 @@ def train_one_epoch(
         loss.backward()
         optimizer.step()
 
-        running_loss += loss.item() * x.size(0)
+        batch_size = x.size(0)
+        running_loss += loss.item() * batch_size
         running_correct += (logits.argmax(dim=1) == y).sum().item()
-        total += x.size(0)
+        total += batch_size
 
-    return running_loss / total, running_correct / total
+        all_preds.append(logits.argmax(dim=1).detach().cpu().numpy())
+        all_targets.append(y.detach().cpu().numpy())
+
+        if writer is not None:
+            writer.add_scalar("batch/train_loss", loss.item(), global_step + batch_idx)
+
+    global_step += len(loader)
+
+    preds = np.concatenate(all_preds)
+    targets = np.concatenate(all_targets)
+
+    return (
+        running_loss / total,
+        running_correct / total,
+        _macro_f1(preds, targets, n_classes),
+        global_step,
+    )
 
 
 @torch.no_grad()
@@ -98,15 +139,7 @@ def evaluate(
     return {
         "loss": running_loss / total,
         "acc": float((preds == targets).mean()),
-        "macro_f1": float(
-            f1_score(
-                targets,
-                preds,
-                average="macro",
-                labels=list(range(n_classes)),
-                zero_division=0,
-            )
-        ),
+        "macro_f1": _macro_f1(preds, targets, n_classes),
     }
 
 
@@ -145,6 +178,7 @@ def fit(
 ) -> TrainHistory:
     """Run the training loop. Saves best + last checkpoints."""
     tcfg = config.training
+    n_classes = config.model.num_classes
     torch.manual_seed(tcfg.seed)
     device = torch.device(config.device)
     model.to(device)
@@ -160,79 +194,113 @@ def fit(
     )
     scheduler = CosineAnnealingLR(optimizer, T_max=tcfg.epochs)
 
+    writer: SummaryWriter | None = None
+    if config.tensorboard.enabled:
+        run_dir = config.tensorboard.log_dir / config.tensorboard.run_name
+        writer = SummaryWriter(log_dir=str(run_dir))
+        log.info("tensorboard: %s", run_dir)
+
     history = TrainHistory()
     initial_best = float("-inf") if tcfg.early_stopping_mode == "max" else float("inf")
     history.best_val_score = initial_best
     epochs_without_improvement = 0
+    global_step = 0
 
-    for epoch in range(tcfg.epochs):
-        train_loss, train_acc = train_one_epoch(
-            model, train_loader, criterion, optimizer, device
-        )
-        val_metrics = evaluate(
-            model, val_loader, criterion, device, n_classes=config.model.num_classes
-        )
-        scheduler.step()
-
-        history.train_loss.append(train_loss)
-        history.train_acc.append(train_acc)
-        history.val_loss.append(val_metrics["loss"])
-        history.val_acc.append(val_metrics["acc"])
-        history.val_f1.append(val_metrics["macro_f1"])
-
-        tracked = (
-            val_metrics["macro_f1"]
-            if tcfg.early_stopping_metric == "macro_f1"
-            else val_metrics["loss"]
-        )
-
-        log.info(
-            "epoch %d/%d  train_loss=%.4f  train_acc=%.4f  "
-            "val_loss=%.4f  val_acc=%.4f  val_f1=%.4f  lr=%.2e",
-            epoch + 1,
-            tcfg.epochs,
-            train_loss,
-            train_acc,
-            val_metrics["loss"],
-            val_metrics["acc"],
-            val_metrics["macro_f1"],
-            scheduler.get_last_lr()[0],
-        )
-
-        if config.checkpoint.save_last:
-            save_checkpoint(
-                config.checkpoint.dir / "last.pt",
+    try:
+        for epoch in range(tcfg.epochs):
+            train_loss, train_acc, train_f1, global_step = train_one_epoch(
                 model,
+                train_loader,
+                criterion,
                 optimizer,
-                epoch,
-                history.best_val_score,
+                device,
+                n_classes=n_classes,
+                writer=writer,
+                global_step=global_step,
+            )
+            val_metrics = evaluate(
+                model, val_loader, criterion, device, n_classes=n_classes
+            )
+            scheduler.step()
+            current_lr = scheduler.get_last_lr()[0]
+
+            history.train_loss.append(train_loss)
+            history.train_acc.append(train_acc)
+            history.train_f1.append(train_f1)
+            history.val_loss.append(val_metrics["loss"])
+            history.val_acc.append(val_metrics["acc"])
+            history.val_f1.append(val_metrics["macro_f1"])
+
+            tracked = (
+                val_metrics["macro_f1"]
+                if tcfg.early_stopping_metric == "macro_f1"
+                else val_metrics["loss"]
             )
 
-        if _score_is_better(tracked, history.best_val_score, tcfg.early_stopping_mode):
-            history.best_val_score = tracked
-            history.best_epoch = epoch
-            history.best_val_loss = val_metrics["loss"]
-            epochs_without_improvement = 0
-            if config.checkpoint.save_best:
+            log.info(
+                "epoch %d/%d | "
+                "train loss=%.4f acc=%.4f f1=%.4f | "
+                "val loss=%.4f acc=%.4f f1=%.4f | "
+                "lr=%.2e",
+                epoch + 1,
+                tcfg.epochs,
+                train_loss,
+                train_acc,
+                train_f1,
+                val_metrics["loss"],
+                val_metrics["acc"],
+                val_metrics["macro_f1"],
+                current_lr,
+            )
+
+            if writer is not None:
+                writer.add_scalar("epoch/train_loss", train_loss, epoch)
+                writer.add_scalar("epoch/train_acc", train_acc, epoch)
+                writer.add_scalar("epoch/train_f1", train_f1, epoch)
+                writer.add_scalar("epoch/val_loss", val_metrics["loss"], epoch)
+                writer.add_scalar("epoch/val_acc", val_metrics["acc"], epoch)
+                writer.add_scalar("epoch/val_f1", val_metrics["macro_f1"], epoch)
+                writer.add_scalar("epoch/lr", current_lr, epoch)
+
+            if config.checkpoint.save_last:
                 save_checkpoint(
-                    config.checkpoint.dir / "best.pt",
+                    config.checkpoint.dir / "last.pt",
                     model,
                     optimizer,
                     epoch,
                     history.best_val_score,
                 )
-        else:
-            epochs_without_improvement += 1
 
-        if epochs_without_improvement >= tcfg.early_stopping_patience:
-            log.info(
-                "early stopping at epoch %d (best epoch %d, %s=%.4f)",
-                epoch + 1,
-                history.best_epoch + 1,
-                tcfg.early_stopping_metric,
-                history.best_val_score,
-            )
-            break
+            if _score_is_better(
+                tracked, history.best_val_score, tcfg.early_stopping_mode
+            ):
+                history.best_val_score = tracked
+                history.best_epoch = epoch
+                history.best_val_loss = val_metrics["loss"]
+                epochs_without_improvement = 0
+                if config.checkpoint.save_best:
+                    save_checkpoint(
+                        config.checkpoint.dir / "best.pt",
+                        model,
+                        optimizer,
+                        epoch,
+                        history.best_val_score,
+                    )
+            else:
+                epochs_without_improvement += 1
+
+            if epochs_without_improvement >= tcfg.early_stopping_patience:
+                log.info(
+                    "early stopping at epoch %d (best epoch %d, %s=%.4f)",
+                    epoch + 1,
+                    history.best_epoch + 1,
+                    tcfg.early_stopping_metric,
+                    history.best_val_score,
+                )
+                break
+    finally:
+        if writer is not None:
+            writer.close()
 
     return history
 

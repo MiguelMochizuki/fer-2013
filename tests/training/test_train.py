@@ -96,11 +96,13 @@ def test_train_one_epoch_returns_loss_and_accuracy(
     model = TinyNet()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-    loss, acc = train_one_epoch(
+    loss, acc, f1, step = train_one_epoch(
         model, train_loader, criterion, optimizer, torch.device("cpu")
     )
     assert isinstance(loss, float)
     assert 0.0 <= acc <= 1.0
+    assert 0.0 <= f1 <= 1.0
+    assert step == len(train_loader)
 
 
 def test_train_one_epoch_updates_parameters(
@@ -226,3 +228,52 @@ def test_fit_can_stop_on_loss(
     history = fit(model, train_loader, val_loader, config)
     assert len(history.train_loss) == 2
     assert history.best_val_score < float("inf")
+
+
+def test_fit_writes_tensorboard_logs(
+    tiny_loaders: tuple[Loader, Loader],
+    tmp_path: Path,
+) -> None:
+    """TensorBoard log dir must be created when enabled."""
+    train_loader, val_loader = tiny_loaders
+    model = TinyNet()
+    config = _make_config(tmp_path, epochs=1)
+    # _make_config leaves tensorboard at defaults (enabled=True, log_dir=runs)
+    # Override to use tmp_path so we don't pollute the repo.
+    config = config.model_copy(
+        update={
+            "tensorboard": config.tensorboard.model_copy(
+                update={"log_dir": tmp_path / "runs"}
+            )
+        }
+    )
+    fit(model, train_loader, val_loader, config)
+    assert (tmp_path / "runs").exists()
+    assert any((tmp_path / "runs").iterdir())
+
+
+def test_train_one_epoch_logs_batches(
+    tiny_loaders: tuple[Loader, Loader],
+    tmp_path: Path,
+) -> None:
+    """When a writer is passed, batch scalars are logged."""
+    from torch.utils.tensorboard import SummaryWriter
+
+    train_loader, _ = tiny_loaders
+    model = TinyNet()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    writer = SummaryWriter(log_dir=str(tmp_path / "tb"))
+    try:
+        train_one_epoch(
+            model,
+            train_loader,
+            criterion,
+            optimizer,
+            torch.device("cpu"),
+            writer=writer,
+        )
+    finally:
+        writer.close()
+    assert (tmp_path / "tb").exists()
+    assert any((tmp_path / "tb").iterdir())

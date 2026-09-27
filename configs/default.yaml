@@ -14,11 +14,16 @@ training:
   lr: 1.0e-4
   weight_decay: 1.0e-4
   early_stopping_patience: 5
-  early_stopping_metric: macro_f1     # macro_f1 | loss
-  early_stopping_mode: max            # max | min
+  early_stopping_metric: macro_f1
+  early_stopping_mode: max
   seed: 42
 
 checkpoint:
   dir: checkpoints
   save_best: true
   save_last: true
+
+tensorboard:
+  enabled: true
+  log_dir: runs
+  run_name: fer2013_resnet18
