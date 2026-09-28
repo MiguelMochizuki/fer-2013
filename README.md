@@ -12,6 +12,7 @@ Facial expression recognition on the [FER-2013](https://www.kaggle.com/datasets/
 2. **Preprocess** — parse the CSV into `.npy` arrays, split into train/val/test.
 3. **Train** — fine-tune an ImageNet-pretrained ResNet18 with a weighted sampler and weighted loss to counter class imbalance, early stopping on validation macro-F1.
 4. **Evaluate** — run the best checkpoint on a split, produce metrics, a confusion matrix, and precision-recall curves.
+5. **Explain** — Grad-CAM++ over the same checkpoint, to see which regions of the face drive correct and incorrect predictions.
 
 ## Setup
 
@@ -131,6 +132,24 @@ uv run python scripts/evaluate.py --checkpoint checkpoints/best.pt --split test
 ```
 
 which writes `reports/test_metrics.json` and fresh plots to `reports/`. `reports/` itself is not tracked; to update the images above, copy the new PNGs into `docs/images/` and commit them.
+
+### Grad-CAM
+
+Grad-CAM++ heatmaps over `model.layer4`, on the logit of the predicted class, for the 6 most confident correct predictions and the 6 most confident misclassifications on the test set.
+
+![Grad-CAM, correctly classified](docs/images/gradcam_correct.png)
+
+Correct predictions concentrate on the mouth and eyes — the regions that actually carry expression.
+
+![Grad-CAM, confident misclassifications](docs/images/gradcam_misclassified.png)
+
+Several confident misclassifications latch onto glasses, hair, or image artifacts instead of the face, which is consistent with `fear`/`sad`/`angry` being the weakest and most-confused classes above.
+
+Regenerate with:
+
+```bash
+uv run python scripts/gradcam_report.py --checkpoint checkpoints/best.pt --split test
+```
 
 ## Development
 

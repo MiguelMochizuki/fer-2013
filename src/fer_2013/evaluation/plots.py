@@ -152,9 +152,50 @@ def plot_pr_curves(
     return out_path
 
 
+def plot_image_grid(
+    images: list[np.ndarray],
+    titles: list[str],
+    out_path: Path,
+    *,
+    ncols: int = 4,
+    dpi: int = DEFAULT_DPI,
+) -> Path:
+    """Grid of (H, W, 3) uint8 images, one per subplot, titled.
+
+    Args:
+        images: list of (H, W, 3) uint8 arrays.
+        titles: one title per image, same length as images.
+        out_path: where to write the PNG.
+        ncols: number of columns; row count follows from len(images).
+        dpi: figure resolution.
+
+    Returns:
+        out_path.
+    """
+    n = len(images)
+    ncols = min(ncols, n)
+    nrows = -(-n // ncols)  # ceil division
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3 * nrows))
+    flat_axes = np.atleast_1d(axes).flatten()
+
+    for ax, image, title in zip(flat_axes, images, titles, strict=False):
+        ax.imshow(image)
+        ax.set_title(title, fontsize=9)
+        ax.axis("off")
+    for ax in flat_axes[n:]:
+        ax.axis("off")
+
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=dpi)
+    plt.close(fig)
+    return out_path
+
+
 __all__ = [
     "HistoryDict",
     "plot_confusion_matrix",
+    "plot_image_grid",
     "plot_pr_curves",
     "plot_training_curves",
 ]
