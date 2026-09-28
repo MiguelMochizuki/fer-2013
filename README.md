@@ -8,11 +8,11 @@ Facial expression recognition on the [FER-2013](https://www.kaggle.com/datasets/
 
 ## Pipeline
 
-1. **Download** — fetch `fer2013.csv` from Kaggle.
-2. **Preprocess** — parse the CSV into `.npy` arrays, split into train/val/test.
-3. **Train** — fine-tune an ImageNet-pretrained ResNet18 with a weighted sampler and weighted loss to counter class imbalance, early stopping on validation macro-F1.
-4. **Evaluate** — run the best checkpoint on a split, produce metrics, a confusion matrix, and precision-recall curves.
-5. **Explain** — Grad-CAM++ over the same checkpoint, to see which regions of the face drive correct and incorrect predictions.
+1. **Download**: fetch `fer2013.csv` from Kaggle.
+2. **Preprocess**: parse the CSV into `.npy` arrays, split into train/val/test.
+3. **Train**: fine-tune an ImageNet-pretrained ResNet18 with a weighted sampler and weighted loss to counter class imbalance, early stopping on validation macro-F1.
+4. **Evaluate**: run the best checkpoint on a split, produce metrics, a confusion matrix, and precision-recall curves.
+5. **Explain**: run Grad-CAM++ on the same checkpoint to see which regions of the face drive correct and incorrect predictions.
 
 ## Setup
 
@@ -94,7 +94,7 @@ Any field can be overridden per run with `--set section.field=value` (see Usage 
 
 ## Results
 
-Latest run — commit `a672782`, trained 2026-09-27.
+Latest run: commit `a672782`, trained 2026-09-27.
 
 Training stopped early after 30 epochs (no early-stopping trigger hit); best validation macro-F1 of **0.6952** was reached at epoch 29.
 
@@ -139,7 +139,7 @@ Grad-CAM++ heatmaps over `model.layer4`, on the logit of the predicted class, fo
 
 ![Grad-CAM, correctly classified](docs/images/gradcam_correct.png)
 
-Correct predictions concentrate on the mouth and eyes — the regions that actually carry expression.
+Correct predictions concentrate on the mouth and eyes, the regions that carry most of the expression.
 
 ![Grad-CAM, confident misclassifications](docs/images/gradcam_misclassified.png)
 

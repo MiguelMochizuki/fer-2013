@@ -65,7 +65,7 @@ def plot_training_curves(
     )
     axes[0].set_xlabel("epoch")
     axes[0].set_ylabel("loss")
-    axes[0].set_title("Loss — train vs val")
+    axes[0].set_title("Loss, train vs val")
     axes[0].legend()
 
     axes[1].plot(epochs, history["train_f1"], label="train", marker="o", ms=3)
@@ -79,7 +79,7 @@ def plot_training_curves(
     )
     axes[1].set_xlabel("epoch")
     axes[1].set_ylabel("macro-F1")
-    axes[1].set_title("Macro-F1 — train vs val")
+    axes[1].set_title("Macro-F1, train vs val")
     axes[1].legend()
 
     plt.tight_layout()
