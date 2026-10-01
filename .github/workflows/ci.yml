@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -61,7 +61,7 @@ jobs:
       HF_SPACE: ${{ vars.HF_SPACE }} # e.g. your-user/fer-2013
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10
       # No stored secret: the Space's Trusted Publisher (Settings > Trusted
       # Publishers: this repo + ci.yml) exchanges the job's OIDC identity for a
       # token that lasts 1 hour and can only write to this Space.
