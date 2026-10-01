@@ -191,7 +191,7 @@ docker build -t fer-api .
 docker run --rm -p 7860:7860 fer-api
 ```
 
-To publish a new model: run the export, `gh release create models-vX.Y.Z models/fer_resnet18.onnx models/fer_fc_weight.npy` (model releases use `models-v*` tags so they don't trigger the app's `v*` deploy; bump major when the serving contract changes, such as architecture, input normalization or labels, minor for a retrain, patch for a re-export), append their `sha256sum` lines to `serving/models.sha256`, and point `RELEASE_URL` in the `Dockerfile` at the new tag. CI tests, builds the image and smoke tests it; pushing a `v*` tag then deploys to a Hugging Face Space (Docker SDK, free CPU tier, which sleeps after 48 hours without traffic and wakes on the next visit) and creates a GitHub Release.
+To publish a new model: run the export, `gh release create models-vX.Y.Z models/fer_resnet18.onnx models/fer_fc_weight.npy` (model releases use `models-v*` tags so they don't trigger the app's `v*` deploy; bump major when the serving contract changes, such as architecture, input normalization or labels, minor for a retrain, patch for a re-export), append their `sha256sum` lines to `serving/models.sha256`, and point `RELEASE_URL` in the `Dockerfile` at the new tag. CI tests, builds the image and smoke tests it. The image runs anywhere Docker does; the hosting target for the public demo is not decided yet.
 
 ### Grad-CAM++ without PyTorch
 
