@@ -42,9 +42,9 @@ def decode_image(data: bytes) -> Image.Image:
         with warnings.catch_warnings():
             # Pillow warns (not raises) between 1x and 2x MAX_IMAGE_PIXELS.
             warnings.simplefilter("error", Image.DecompressionBombWarning)
-            img = Image.open(io.BytesIO(data), formats=FORMATS)
-            img.load()  # decode fully so truncated files fail here
-        img = ImageOps.exif_transpose(img)
+            opened = Image.open(io.BytesIO(data), formats=FORMATS)
+            opened.load()  # decode fully so truncated files fail here
+        img: Image.Image = ImageOps.exif_transpose(opened)
         if img.mode.startswith("I") or img.mode == "F":
             img = to_gray(img)  # high-bit-depth: scale to 8 bits first
         return img.convert("RGB")
