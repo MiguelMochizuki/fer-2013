@@ -103,7 +103,7 @@ Any field can be overridden per run with `--set section.field=value` (see Usage 
 
 ## Results
 
-Latest run: trained 2026-10-01 with the training code at `a672782` (unchanged since the previous run, which this one replaces). It ran all 30 epochs without triggering early stopping; the best validation macro-F1 of **0.6842** was reached at epoch 28.
+Latest run: trained 2026-10-01 with the training code at `a672782` and the default seed (42), the same code and seed as the previous run, which this one replaces. It ran all 30 epochs without triggering early stopping; the best validation macro-F1 of **0.6842** was reached at epoch 28.
 
 ### Test set
 
@@ -112,7 +112,7 @@ Latest run: trained 2026-10-01 with the training code at `a672782` (unchanged si
 | Accuracy | 0.7074 |
 | Macro-F1 | 0.7090 |
 
-The previous run of the same code scored 0.7122 and 0.7153. With 3,589 test images the standard error of the accuracy is about 0.8 points, and these are single runs, so that gap is within run-to-run noise.
+The previous run with the same code and seed scored 0.7122 and 0.7153. Training only calls `torch.manual_seed` and does not enable deterministic CUDA kernels, so runs are not bit-reproducible, and with 3,589 test images the standard error of the accuracy is about 0.8 points. A gap of half a point between two single runs is within that noise; averaging several seeds would be needed to tell real changes from it.
 
 ### Per-class (test set)
 
