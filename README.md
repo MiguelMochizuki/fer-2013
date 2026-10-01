@@ -1,6 +1,6 @@
 # FER-2013
 
-Facial expression recognition on the [FER-2013](https://www.kaggle.com/datasets/deadskull7/fer2013) dataset: a ResNet18 fine-tuned on 48x48 grayscale faces to classify one of seven emotions, with a full pipeline from raw CSV to trained model to evaluation report.
+Facial expression recognition on the [FER-2013](https://www.kaggle.com/datasets/deadskull7/fer2013) dataset: a ResNet18 fine-tuned on 48x48 grayscale faces to classify one of seven emotions, with a full pipeline from raw CSV to trained model to evaluation report, and a torch-free FastAPI service that serves the model with face detection and Grad-CAM++ explanations.
 
 ## Emotions
 
@@ -13,6 +13,7 @@ Facial expression recognition on the [FER-2013](https://www.kaggle.com/datasets/
 3. **Train**: fine-tune an ImageNet-pretrained ResNet18 with a weighted sampler and weighted loss to counter class imbalance, early stopping on validation macro-F1.
 4. **Evaluate**: run the best checkpoint on a split, produce metrics, a confusion matrix, and precision-recall curves.
 5. **Explain**: run Grad-CAM++ on the same checkpoint to see which regions of the face drive correct and incorrect predictions.
+6. **Serve**: export the checkpoint to ONNX and run it behind a FastAPI app (see [API](#api)). The service detects faces in a photo, classifies each one and can return the Grad-CAM++ heatmap, without PyTorch in the runtime image.
 
 ## Setup
 
@@ -21,6 +22,8 @@ Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 ```bash
 uv sync
 ```
+
+`uv sync` installs everything, including the dev tools. The API image installs only the `serve` dependency group (no PyTorch); `export` adds `onnx` for exporting a checkpoint.
 
 To download the dataset yourself, add Kaggle credentials to a `.env` file (see `.env.example`):
 
@@ -46,6 +49,12 @@ uv run python scripts/train.py --config configs/default.yaml --set training.epoc
 
 # 4. Evaluate the best checkpoint on the test set
 uv run python scripts/evaluate.py --checkpoint checkpoints/best.pt --split test
+
+# 5. Explain predictions with Grad-CAM++
+uv run python scripts/gradcam_report.py --checkpoint checkpoints/best.pt --split test
+
+# 6. Export to ONNX for the API (see the API section)
+uv run python scripts/export_onnx.py --checkpoint checkpoints/best.pt --out-dir models/
 ```
 
 Training writes checkpoints to `checkpoints/`, TensorBoard logs to `runs/`, and a per-epoch history JSON to `reports/`. View training progress with:
@@ -94,36 +103,38 @@ Any field can be overridden per run with `--set section.field=value` (see Usage 
 
 ## Results
 
-Latest run: commit `a672782`, trained 2026-09-27.
-
-Training stopped early after 30 epochs (no early-stopping trigger hit); best validation macro-F1 of **0.6952** was reached at epoch 29.
+Latest run: trained 2026-10-01 with the training code at `a672782` (unchanged since the previous run, which this one replaces). It ran all 30 epochs without triggering early stopping; the best validation macro-F1 of **0.6842** was reached at epoch 28.
 
 ### Test set
 
 | Metric   | Value  |
 |----------|--------|
-| Accuracy | 0.7122 |
-| Macro-F1 | 0.7153 |
+| Accuracy | 0.7074 |
+| Macro-F1 | 0.7090 |
+
+The previous run of the same code scored 0.7122 and 0.7153. With 3,589 test images the standard error of the accuracy is about 0.8 points, and these are single runs, so that gap is within run-to-run noise.
 
 ### Per-class (test set)
 
 | Emotion  | Precision | Recall | F1    | Support |
 |----------|-----------|--------|-------|---------|
-| angry    | 0.643     | 0.635  | 0.639 | 491     |
-| disgust  | 0.843     | 0.782  | 0.811 | 55      |
-| fear     | 0.639     | 0.547  | 0.590 | 528     |
-| happy    | 0.900     | 0.870  | 0.885 | 879     |
-| sad      | 0.549     | 0.572  | 0.561 | 594     |
-| surprise | 0.835     | 0.841  | 0.838 | 416     |
-| neutral  | 0.641     | 0.730  | 0.683 | 626     |
+| angry    | 0.626     | 0.646  | 0.636 | 491     |
+| disgust  | 0.840     | 0.764  | 0.800 | 55      |
+| fear     | 0.590     | 0.589  | 0.590 | 528     |
+| happy    | 0.910     | 0.866  | 0.887 | 879     |
+| sad      | 0.565     | 0.544  | 0.554 | 594     |
+| surprise | 0.808     | 0.820  | 0.814 | 416     |
+| neutral  | 0.657     | 0.709  | 0.682 | 626     |
 
-`fear` and `sad` are the weakest classes and are also the most frequently confused with each other; `happy` and `disgust` are the strongest, though `disgust` has by far the smallest support (55 test samples) so its F1 is noisier than the others.
+`sad` (F1 0.554) and `fear` (0.590) are the weakest classes. `sad` is mostly mistaken for `neutral` (18% of its samples), `angry` (12%) and `fear` (11%); `fear` for `sad` (15%) and `angry` (11%). `happy` (0.887) and `surprise` (0.814) are the strongest. `disgust` scores 0.800 but has by far the smallest support (55 test samples), so its F1 is noisier than the others.
 
 ![Confusion matrix](docs/images/confusion_matrix.png)
 
 ![Precision-recall curves](docs/images/pr_curves.png)
 
 ![Training curves](docs/images/training_curves.png)
+
+The model overfits: validation loss is lowest at epoch 4 (1.03) and climbs to 1.48 while training loss falls to 0.05, and the final training accuracy is 0.959 against 0.690 on validation. Validation macro-F1 keeps creeping up and plateaus around 0.68 from epoch 22 on, which is why early stopping on that metric never fires. Stronger regularization or earlier stopping on validation loss are the obvious next experiments.
 
 Regenerate this table and these plots for a new run with:
 
@@ -135,15 +146,15 @@ which writes `reports/test_metrics.json` and fresh plots to `reports/`. `reports
 
 ### Grad-CAM
 
-Grad-CAM++ heatmaps over `model.layer4`, on the logit of the predicted class, for the 6 most confident correct predictions and the 6 most confident misclassifications on the test set.
+Grad-CAM++ heatmaps over `model.layer4`, on the logit of the predicted class, for the 8 most confident correct predictions and the 8 most confident misclassifications on the test set.
 
 ![Grad-CAM, correctly classified](docs/images/gradcam_correct.png)
 
-Correct predictions concentrate on the mouth and eyes, the regions that carry most of the expression.
+Correct predictions concentrate on the mouth and nose, with the eyebrows and eyes also lit up for `angry` and `disgust`: the central face region that carries most of the expression.
 
 ![Grad-CAM, confident misclassifications](docs/images/gradcam_misclassified.png)
 
-Several confident misclassifications latch onto glasses, hair, or image artifacts instead of the face, which is consistent with `fear`/`sad`/`angry` being the weakest and most-confused classes above.
+The confident mistakes are mostly `fear` and `sad`/`angry` samples. Several involve an open mouth (`fear` read as `surprise`), glasses, a tilted or partly out-of-frame face, or a wink, where the heat lands on the glasses rim or on one eye instead of the whole expression. That is consistent with `fear`, `sad` and `angry` being the weakest and most-confused classes above.
 
 Regenerate with:
 
@@ -199,18 +210,23 @@ The head is `avgpool -> Dropout -> Linear`, so in eval mode the gradient of a cl
 
 ### Performance
 
-Measured with `scripts/benchmark.py` on a 12th Gen Intel i5-12450HX against the Docker image (an untrained classifier of the same architecture, so timings are representative; a 260x260 image with one face, 50 requests):
+The exported model reproduces the PyTorch one: through the ONNX Runtime pipeline with the serving preprocessing, the full test set scores 70.80% accuracy against 70.74% in PyTorch, and 99.94% of predictions are identical (2 of 3,589 differ).
+
+Latency measured with `scripts/benchmark.py` against the Docker image (a 260x260 image with one face; `p50` / `p95` of the full request). On a 12th Gen Intel i5-12450HX with no CPU limit, 50 requests:
 
 | Request            | p50 (ms) | p95 (ms) |
 |--------------------|----------|----------|
-| `explain=false`    | 22.8     | 24.3     |
-| `explain=true`     | 26.9     | 30.5     |
+| `explain=false`    | 22.9     | 27.6     |
+| `explain=true`     | 26.0     | 32.8     |
 
-Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus PyTorch 24.1 ms. The Docker image is 742 MB on disk (330 MB of Python packages, 43 MB of models); an environment with PyTorch and its CUDA wheels is over 4 GB. Free-tier hardware is slower than this machine.
+Restricted to the size of a typical free hosting tier (`docker run --cpus 0.1 --memory 512m`, 15 requests, two repeated runs): about 1.8 to 2.0 s p50 without `explain` and 2.3 to 2.6 s with it, a boot of about 30 s, and 212 MiB of memory in use. It fits a 512 MB instance, but it is slow on a tenth of a core.
+
+Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus PyTorch 24.1 ms. The Docker image is 742 MB on disk (330 MB of Python packages, 43 MB of models); an environment with PyTorch and its CUDA wheels is over 4 GB.
 
 ### Limitations and privacy
 
 - The classifier reaches about 71% accuracy on FER-2013 (see Results) and inherits the dataset's biases: acted or web-scraped expressions, uneven demographics, noisy labels. Emotion labels from a face are not a reliable read of how someone feels. Do not use this for decisions about people.
+- Faces from a detector are cropped square with a 10% margin before classification. On 1,476 FER test faces upscaled 4x (98% of 1,500 detected), classifying the detector crop scores 68.9% against 69.5% for the original 48x48 image on the same faces, and margins from 0% to 40% all land between 68.6% and 68.9%. So the crop costs about 0.6 points and the margin hardly matters. This is a proxy built from FER faces, not a benchmark on real photos.
 - Uploaded images are processed in memory and never written to disk or logged. Uploads are limited to 5 MB and JPEG, PNG or WebP.
 - The service is public and unauthenticated; it caps concurrent work and answers `503` when busy.
 
@@ -222,6 +238,8 @@ uv run ruff format .        # format
 uv run mypy                 # type check
 uv run pytest -q            # tests
 ```
+
+CI (`.github/workflows/ci.yml`) runs lint, format check, mypy and the tests on every push and pull request; once the model release exists it also builds the Docker image and smoke tests it with `scripts/smoke_test.sh`.
 
 Pre-commit hooks run lint and format on commit, and type checking plus the full test suite on push:
 
