@@ -11,7 +11,7 @@ RUN apt-get update \
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --only-group serve --no-install-project
 
-ARG RELEASE_URL=https://github.com/MiguelMochizuki/fer-2013/releases/download/v0.1.0
+ARG RELEASE_URL=https://github.com/MiguelMochizuki/fer-2013/releases/download/models-v1
 ARG SHA_FILE=serving/models.sha256
 COPY scripts/fetch_models.sh /usr/local/bin/fetch_models.sh
 COPY ${SHA_FILE} /tmp/models.sha256
