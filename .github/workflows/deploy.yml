@@ -18,11 +18,15 @@ jobs:
           HF_SPACE: ${{ vars.HF_SPACE }} # e.g. your-user/fer-2013
         run: |
           set -eu
+          # Push only the build context: HF rejects binary files (docs images,
+          # test fixtures) not stored with LFS/Xet, and the Space doesn't need them.
+          mkdir space
+          cp -r Dockerfile .dockerignore pyproject.toml uv.lock LICENSE NOTICE src serving space/
+          mkdir space/scripts && cp scripts/fetch_models.sh space/scripts/
           # Spaces need YAML front matter in README.md; the GitHub README has none.
-          rm -rf .git
           printf -- '---\ntitle: FER-2013 Emotion API\nsdk: docker\napp_port: 7860\n---\n\n' \
-            | cat - README.md > README.tmp
-          mv README.tmp README.md
+            | cat - README.md > space/README.md
+          cd space
           git init -q -b main
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"

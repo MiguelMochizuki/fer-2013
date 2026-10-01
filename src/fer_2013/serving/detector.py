@@ -56,7 +56,7 @@ class YuNetDetector:
         scale = min(1.0, self._max_side / max(rgb.size))
         if scale < 1.0:
             rgb = rgb.resize(
-                (round(rgb.width * scale), round(rgb.height * scale)),
+                (max(1, round(rgb.width * scale)), max(1, round(rgb.height * scale))),
                 Image.Resampling.BILINEAR,
             )
         bgr = np.ascontiguousarray(np.asarray(rgb)[:, :, ::-1])

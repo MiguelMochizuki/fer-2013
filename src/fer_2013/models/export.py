@@ -44,6 +44,7 @@ def export_classifier(model: ResNet, out_dir: Path) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     onnx_path = out_dir / ONNX_NAME
     fc_path = out_dir / FC_WEIGHT_NAME
+    tmp_path = out_dir / (ONNX_NAME + ".tmp")
 
     model.eval()
     wrapper = _WithFeatures(model).eval()
@@ -52,7 +53,7 @@ def export_classifier(model: ResNet, out_dir: Path) -> tuple[Path, Path]:
     torch.onnx.export(
         wrapper,
         (dummy,),
-        str(onnx_path),
+        str(tmp_path),
         input_names=["input"],
         output_names=["logits", "features"],
         dynamic_axes={"input": batch, "logits": batch, "features": batch},
@@ -60,12 +61,17 @@ def export_classifier(model: ResNet, out_dir: Path) -> tuple[Path, Path]:
         dynamo=False,
     )
 
-    with torch.no_grad():
-        want_logits, want_feats = (t.numpy() for t in wrapper(dummy))
-    sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
-    got_logits, got_feats = sess.run(None, {"input": dummy.numpy()})
-    np.testing.assert_allclose(got_logits, want_logits, atol=1e-4)
-    np.testing.assert_allclose(got_feats, want_feats, atol=1e-4)
+    try:
+        with torch.no_grad():
+            want_logits, want_feats = (t.numpy() for t in wrapper(dummy))
+        sess = ort.InferenceSession(str(tmp_path), providers=["CPUExecutionProvider"])
+        got_logits, got_feats = sess.run(None, {"input": dummy.numpy()})
+        np.testing.assert_allclose(got_logits, want_logits, atol=1e-4)
+        np.testing.assert_allclose(got_feats, want_feats, atol=1e-4)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
+    tmp_path.replace(onnx_path)  # only a verified model gets the final name
 
     fc_weight = model.fc[1].weight.detach().cpu().numpy().astype(np.float32)
     np.save(fc_path, fc_weight)

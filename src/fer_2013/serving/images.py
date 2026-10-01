@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import warnings
 from collections.abc import Iterable
 
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -39,11 +38,12 @@ def read_limited(chunks: Iterable[bytes]) -> bytes:
 def decode_image(data: bytes) -> Image.Image:
     """Decode a JPEG/PNG/WebP upload to an upright RGB image."""
     try:
-        with warnings.catch_warnings():
-            # Pillow warns (not raises) between 1x and 2x MAX_IMAGE_PIXELS.
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            opened = Image.open(io.BytesIO(data), formats=FORMATS)
-            opened.load()  # decode fully so truncated files fail here
+        opened = Image.open(io.BytesIO(data), formats=FORMATS)
+        # Pillow only warns between 1x and 2x MAX_IMAGE_PIXELS, and silencing
+        # warnings is process-wide (not thread-safe), so check explicitly.
+        if opened.width * opened.height > MAX_PIXELS:
+            raise ImageRejected(422, "invalid or unsupported image")
+        opened.load()  # decode fully so truncated files fail here
         img: Image.Image = ImageOps.exif_transpose(opened)
         if img.mode.startswith("I") or img.mode == "F":
             img = to_gray(img)  # high-bit-depth: scale to 8 bits first
@@ -51,7 +51,6 @@ def decode_image(data: bytes) -> Image.Image:
     except (
         UnidentifiedImageError,
         Image.DecompressionBombError,
-        Image.DecompressionBombWarning,
         OSError,
         SyntaxError,
         ValueError,

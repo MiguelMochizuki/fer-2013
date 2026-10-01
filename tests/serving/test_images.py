@@ -1,4 +1,5 @@
 import io
+import warnings
 
 import pytest
 from PIL import Image
@@ -68,3 +69,14 @@ def test_decode_accepts_other_png_modes(mode: str) -> None:
     img = decode_image(_encode(Image.new(mode, (32, 32)), "PNG"))
     assert img.mode == "RGB"
     assert img.size == (32, 32)
+
+
+def test_pixel_limit_does_not_depend_on_warning_filters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """warnings.catch_warnings is process-wide, so another thread can undo it."""
+    bomb = _encode(Image.new("1", (6000, 6000)), "PNG")  # 36 MP > 25 MP limit
+    monkeypatch.setattr(warnings, "simplefilter", lambda *a, **k: None)
+    with pytest.raises(ImageRejected) as e:
+        decode_image(bomb)
+    assert e.value.status_code == 422

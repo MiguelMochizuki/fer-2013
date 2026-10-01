@@ -1,6 +1,5 @@
 .git
 .venv
-.superpowers
 .env
 data
 checkpoints

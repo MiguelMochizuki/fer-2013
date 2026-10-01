@@ -61,3 +61,10 @@ def test_concurrent_calls_do_not_corrupt(detector: YuNetDetector) -> None:
     assert all(len(r) >= 1 for r in results)
     first = results[0][0]
     assert all(r[0] == first for r in results)
+
+
+@pytest.mark.parametrize("size", [(5000, 2), (20000, 1)])
+def test_very_thin_images_do_not_crash(
+    detector: YuNetDetector, size: tuple[int, int]
+) -> None:
+    assert detector.detect(Image.new("RGB", size)) == []

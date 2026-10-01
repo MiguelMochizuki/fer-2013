@@ -33,10 +33,14 @@ def percentiles(samples: list[float]) -> dict[str, float]:
 def _post(url: str, image: bytes) -> None:
     boundary = uuid.uuid4().hex
     body = (
-        f"--{boundary}\r\n"
-        'Content-Disposition: form-data; name="file"; filename="img.jpg"\r\n'
-        "Content-Type: image/jpeg\r\n\r\n"
-    ).encode() + image + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="file"; filename="img.jpg"\r\n'
+            "Content-Type: image/jpeg\r\n\r\n"
+        ).encode()
+        + image
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
     req = urllib.request.Request(
         url,
         data=body,
