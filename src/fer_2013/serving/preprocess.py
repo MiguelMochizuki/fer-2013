@@ -26,19 +26,30 @@ def to_gray(img: Image.Image) -> Image.Image:
     return img.convert("L")
 
 
-def crop_gray(image: Image.Image, box: Box, margin: float = 0.10) -> Image.Image | None:
-    """Crop `box` (plus `margin` on every side) as an 'L' image.
+def _fit(start: int, side: int, limit: int) -> int:
+    """Slide a window of `side` into [0, limit]; if it cannot fit, start at 0."""
+    return 0 if side >= limit else min(max(start, 0), limit - side)
 
-    The crop is clamped to the image. Returns None if it has no area.
+
+def crop_gray(image: Image.Image, box: Box, margin: float = 0.10) -> Image.Image | None:
+    """Square crop around `box` (grown by `margin` on every side) as an 'L' image.
+
+    FER-2013 faces are square, so the crop is too; near a border the square is
+    slid inside the image. Returns None if the box is empty or outside it.
     """
-    dx, dy = box.w * margin, box.h * margin
-    x0 = max(int(box.x - dx), 0)
-    y0 = max(int(box.y - dy), 0)
-    x1 = min(int(box.x + box.w + dx), image.width)
-    y1 = min(int(box.y + box.h + dy), image.height)
-    if x1 <= x0 or y1 <= y0:
+    if box.w <= 0 or box.h <= 0:
         return None
-    return to_gray(image.crop((x0, y0, x1, y1)))
+    if box.x + box.w <= 0 or box.x >= image.width:
+        return None
+    if box.y + box.h <= 0 or box.y >= image.height:
+        return None
+    side = int(max(box.w, box.h) * (1 + 2 * margin))
+    x0 = _fit(int(box.x + box.w / 2 - side / 2), side, image.width)
+    y0 = _fit(int(box.y + box.h / 2 - side / 2), side, image.height)
+    crop = image.crop(
+        (x0, y0, min(x0 + side, image.width), min(y0 + side, image.height))
+    )
+    return to_gray(crop)
 
 
 def to_input(gray: Image.Image) -> np.ndarray:

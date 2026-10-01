@@ -22,7 +22,7 @@ from starlette.formparsers import MultiPartParser
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from fer_2013.serving.classifier import Classifier
-from fer_2013.serving.detector import FaceDetector, YuNetDetector
+from fer_2013.serving.detector import Box, FaceDetector, YuNetDetector
 from fer_2013.serving.gradcam import gradcam_pp, overlay_png_b64
 from fer_2013.serving.images import (
     MAX_UPLOAD_BYTES,
@@ -109,6 +109,45 @@ class _BodyLimit:
         await self.app(scope, limited_receive, send)
 
 
+class _ConcurrencyLimit:
+    """Answer 503 to POST /predict when all slots are taken.
+
+    Runs before the body is read, so a rejected upload is never buffered.
+    """
+
+    def __init__(self, app: ASGIApp, slots: threading.BoundedSemaphore) -> None:
+        self.app = app
+        self.slots = slots
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            scope["type"] != "http"
+            or scope["path"] != "/predict"
+            or scope["method"] != "POST"
+        ):
+            await self.app(scope, receive, send)
+            return
+        if not self.slots.acquire(blocking=False):
+            resp = JSONResponse(
+                {"detail": "server busy"}, status_code=503, headers={"Retry-After": "1"}
+            )
+            await resp(scope, receive, send)
+            return
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            self.slots.release()
+
+
+def _clamp(box: Box, width: int, height: int) -> Box | None:
+    """Intersect a detector box with the image; None if nothing is left."""
+    x0, y0 = max(box.x, 0), max(box.y, 0)
+    x1, y1 = min(box.x + box.w, width), min(box.y + box.h, height)
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return Box(x0, y0, x1 - x0, y1 - y0, box.score)
+
+
 def create_app(
     classifier: Classifier | None = None,
     detector: FaceDetector | None = None,
@@ -132,7 +171,10 @@ def create_app(
     app.state.classifier = classifier
     app.state.detector = detector
     app.add_middleware(_BodyLimit, limit=MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD)
-    slots = threading.BoundedSemaphore(max_concurrent)
+    # Added last, so it is the outermost middleware and runs first.
+    app.add_middleware(
+        _ConcurrencyLimit, slots=threading.BoundedSemaphore(max_concurrent)
+    )
 
     @app.exception_handler(ImageRejected)
     async def _rejected(_: Request, exc: ImageRejected) -> JSONResponse:
@@ -158,25 +200,21 @@ def create_app(
         }
 
     @app.post("/predict", response_model=PredictResponse)
-    def predict(
-        file: UploadFile, explain: bool = False
-    ) -> PredictResponse | JSONResponse:
-        if not slots.acquire(blocking=False):
-            return JSONResponse(
-                {"detail": "server busy"}, status_code=503, headers={"Retry-After": "1"}
-            )
-        try:
-            return _predict(file, explain)
-        finally:
-            slots.release()
+    def predict(file: UploadFile, explain: bool = False) -> PredictResponse:
+        return _predict(file, explain)
 
     def _predict(file: UploadFile, explain: bool) -> PredictResponse:
         clf: Classifier = app.state.classifier
         det: FaceDetector = app.state.detector
         t0 = time.perf_counter()
         image = decode_image(read_limited(iter(lambda: file.file.read(CHUNK), b"")))
+        t_decoded = time.perf_counter()
 
-        boxes = det.detect(image)
+        boxes = [
+            b
+            for raw in det.detect(image)
+            if (b := _clamp(raw, image.width, image.height)) is not None
+        ]
         t1 = time.perf_counter()
 
         crops = [
@@ -210,7 +248,9 @@ def create_app(
             image=ImageInfo(width=image.width, height=image.height),
             faces=faces,
             timings_ms=Timings(
-                detect=(t1 - t0) * 1e3, classify=(t2 - t1) * 1e3, total=(t2 - t0) * 1e3
+                detect=(t1 - t_decoded) * 1e3,
+                classify=(t2 - t1) * 1e3,
+                total=(t2 - t0) * 1e3,
             ),
         )
 

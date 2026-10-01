@@ -48,3 +48,23 @@ def test_crop_accepts_other_modes(mode: str) -> None:
     out = crop_gray(img, Box(8, 8, 40, 40, 0.9))
     assert out is not None
     assert out.mode == "L"
+
+
+def test_crop_is_square_for_a_tall_box() -> None:
+    img = Image.new("RGB", (300, 300))
+    out = crop_gray(img, Box(100, 80, 90, 113, 0.9))
+    assert out is not None
+    assert out.width == out.height == int(113 * 1.2)
+
+
+def test_crop_stays_square_next_to_the_border() -> None:
+    img = Image.new("RGB", (300, 300))
+    out = crop_gray(img, Box(0, 50, 60, 80, 0.9))
+    assert out is not None
+    assert out.width == out.height
+
+
+def test_crop_of_a_box_outside_the_image_is_none() -> None:
+    img = Image.new("RGB", (100, 100))
+    assert crop_gray(img, Box(150, 10, 20, 20, 0.9)) is None
+    assert crop_gray(img, Box(-30, 10, 20, 20, 0.9)) is None

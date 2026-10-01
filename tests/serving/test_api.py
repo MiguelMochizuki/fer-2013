@@ -211,3 +211,33 @@ def test_index_served(client: TestClient) -> None:
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/html")
     assert '<input type="file"' in r.text
+
+
+def test_response_boxes_are_clamped_to_the_image(
+    client: TestClient, detector: FakeDetector
+) -> None:
+    detector.boxes = [Box(-3, 10, 50, 50, 0.9), Box(180, 180, 50, 50, 0.8)]
+    faces = _post(client, _png((200, 200))).json()["faces"]
+    boxes = [f["box"] for f in faces]
+    assert boxes == [
+        {"x": 0, "y": 10, "w": 47, "h": 50},
+        {"x": 180, "y": 180, "w": 20, "h": 20},
+    ]
+
+
+def test_timings_detect_excludes_upload_decoding(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    from fer_2013.serving import api
+    from fer_2013.serving.images import decode_image as real
+
+    def slow_decode(data: bytes) -> Image.Image:
+        time.sleep(0.2)
+        return real(data)
+
+    monkeypatch.setattr(api, "decode_image", slow_decode)
+    t = _post(client, _png()).json()["timings_ms"]
+    assert t["detect"] < 100
+    assert t["total"] >= 200
