@@ -18,7 +18,7 @@ STD = (0.229, 0.224, 0.225)
 FACE_SIZE = (48, 48)
 
 
-def _to_gray(img: Image.Image) -> Image.Image:
+def to_gray(img: Image.Image) -> Image.Image:
     if img.mode.startswith("I") or img.mode == "F":
         a = np.asarray(img, dtype=np.float32)
         hi = 65535.0 if img.mode.startswith("I;16") else max(float(a.max()), 1.0)
@@ -38,7 +38,7 @@ def crop_gray(image: Image.Image, box: Box, margin: float = 0.10) -> Image.Image
     y1 = min(int(box.y + box.h + dy), image.height)
     if x1 <= x0 or y1 <= y0:
         return None
-    return _to_gray(image.crop((x0, y0, x1, y1)))
+    return to_gray(image.crop((x0, y0, x1, y1)))
 
 
 def to_input(gray: Image.Image) -> np.ndarray:
