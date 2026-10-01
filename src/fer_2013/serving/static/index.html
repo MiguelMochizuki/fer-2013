@@ -170,9 +170,13 @@
         return;
       }
       var data = await res.json();
-      var bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-      drawImage(bitmap, data.faces);
       renderFaces(data.faces);
+      try {
+        drawImage(await createImageBitmap(file, { imageOrientation: "from-image" }), data.faces);
+      } catch (e) {
+        // The server decoded it; this browser just can't draw it (e.g. WebP on old Safari).
+        stage.style.display = "none";
+      }
       setStatus(
         data.faces.length
           ? data.faces.length + " face(s) found in " + Math.round(data.timings_ms.total) + " ms."
