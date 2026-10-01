@@ -39,6 +39,24 @@ dev = [
     "jupyterlab>=4.0.0",
     "ipykernel>=6.29.0",
     "types-PyYAML>=6.0.12",
+    {include-group = "serve"},
+    {include-group = "export"},
+]
+
+# Runtime deps of the API image (no torch).
+serve = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "onnxruntime>=1.18.0",
+    "numpy>=1.24.0",
+    "Pillow>=10.0.0",
+    "opencv-python-headless>=4.9.0",
+    "python-multipart>=0.0.9",
+]
+
+# Only needed locally to export the ONNX classifier.
+export = [
+    "onnx>=1.16.0",
 ]
 
 [build-system]
@@ -99,6 +117,9 @@ module = [
     "seaborn.*",
     "sklearn.*",
     "pytorch_grad_cam.*",
+    "onnxruntime.*",
+    "onnx.*",
+    "cv2.*",
 ]
 ignore_missing_imports = true
 
@@ -107,3 +128,4 @@ ignore_missing_imports = true
 # ==============================
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: needs checkpoints/best.pt"]
