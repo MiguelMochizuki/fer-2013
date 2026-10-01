@@ -204,3 +204,10 @@ def test_timings_present(client: TestClient) -> None:
     t = _post(client, _png()).json()["timings_ms"]
     assert set(t) == {"detect", "classify", "total"}
     assert t["total"] >= t["detect"] >= 0
+
+
+def test_index_served(client: TestClient) -> None:
+    r = client.get("/")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    assert '<input type="file"' in r.text

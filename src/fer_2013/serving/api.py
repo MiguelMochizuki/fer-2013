@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from starlette.formparsers import MultiPartParser
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -37,6 +37,7 @@ logger = logging.getLogger("fer_2013.serving")
 
 MULTIPART_OVERHEAD = 64 * 1024
 CHUNK = 64 * 1024
+STATIC_DIR = Path(__file__).parent / "static"
 CLASSIFIER_FILE = "fer_resnet18.onnx"
 FC_WEIGHT_FILE = "fer_fc_weight.npy"
 DETECTOR_FILE = "face_detection_yunet_2023mar.onnx"
@@ -141,6 +142,10 @@ def create_app(
     async def _unexpected(_: Request, exc: Exception) -> JSONResponse:
         logger.error("unhandled error", exc_info=exc)
         return JSONResponse({"detail": "internal error"}, status_code=500)
+
+    @app.get("/", include_in_schema=False)
+    def index() -> FileResponse:
+        return FileResponse(STATIC_DIR / "index.html")
 
     @app.get("/health")
     def health() -> dict[str, object]:
