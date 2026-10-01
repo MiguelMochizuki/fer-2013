@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FER-2013 Emotion Demo</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --surface: #ffffff; --text: #1d1d1b; --muted: #6b6a64;
+    --line: #dedcd3; --accent: #2f5d50; --accent-soft: #dfeae5; --error: #a3322a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151614; --surface: #1d1f1c; --text: #ecebe6; --muted: #a09f97;
+      --line: #33352f; --accent: #8cc2ae; --accent-soft: #263630; --error: #f08a80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151614; --surface: #1d1f1c; --text: #ecebe6; --muted: #a09f97;
+    --line: #33352f; --accent: #8cc2ae; --accent-soft: #263630; --error: #f08a80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 880px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+  input[type="file"] { max-width: 100%; }
+  label.check { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+  #status { min-height: 1.5em; margin: 12px 0 0; color: var(--muted); }
+  #status.error { color: var(--error); }
+  #stage { margin-top: 16px; display: none; }
+  canvas { max-width: 100%; height: auto; border-radius: 8px; display: block; }
+  #faces {
+    display: grid; gap: 12px; margin-top: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+  .face { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .face h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  .face h2 span { color: var(--muted); font-weight: 400; }
+  .face img { width: 128px; height: 128px; border-radius: 6px; display: block; margin-bottom: 8px; }
+  .row { display: grid; grid-template-columns: 70px 1fr 44px; gap: 8px; align-items: center; font-size: 0.85rem; }
+  .bar { height: 8px; background: var(--accent-soft); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .note { color: var(--muted); font-size: 0.85rem; margin-top: 24px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>FER-2013 emotion demo</h1>
+  <p class="sub">Upload a photo. Faces are detected, classified into 7 emotions, and optionally explained with Grad-CAM++.</p>
+
+  <div class="panel">
+    <div class="controls">
+      <input type="file" id="file" accept="image/jpeg,image/png,image/webp">
+      <label class="check"><input type="checkbox" id="explain" checked> Grad-CAM++ heatmaps</label>
+    </div>
+    <p id="status" role="status"></p>
+    <div id="stage"><canvas id="canvas"></canvas></div>
+    <div id="faces"></div>
+  </div>
+
+  <p class="note">
+    Images are processed in memory and never stored. Max 5 MB, JPEG/PNG/WebP.
+    This model reaches about 71% accuracy on FER-2013 and reflects that dataset's biases;
+    do not use it for decisions about people.
+    API docs: <a href="/docs">/docs</a>.
+  </p>
+</main>
+<script>
+(function () {
+  "use strict";
+  var fileInput = document.getElementById("file");
+  var explain = document.getElementById("explain");
+  var statusEl = document.getElementById("status");
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("canvas");
+  var facesEl = document.getElementById("faces");
+  var MESSAGES = {
+    413: "That file is larger than 5 MB.",
+    422: "That doesn't look like a valid JPEG, PNG or WebP image.",
+    503: "The server is busy. Try again in a moment."
+  };
+
+  function setStatus(text, isError) {
+    statusEl.textContent = text;
+    statusEl.className = isError ? "error" : "";
+  }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function drawImage(bitmap, faces) {
+    var scale = Math.min(1, 820 / bitmap.width);
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 3;
+    ctx.font = "600 14px system-ui, sans-serif";
+    faces.forEach(function (f, i) {
+      var b = f.box;
+      ctx.strokeStyle = "#e0a526";
+      ctx.strokeRect(b.x * scale, b.y * scale, b.w * scale, b.h * scale);
+      var label = (i + 1) + " " + f.emotion;
+      var w = ctx.measureText(label).width + 10;
+      var y = Math.max(0, b.y * scale - 20);
+      ctx.fillStyle = "#e0a526";
+      ctx.fillRect(b.x * scale, y, w, 20);
+      ctx.fillStyle = "#1d1d1b";
+      ctx.fillText(label, b.x * scale + 5, y + 15);
+    });
+    stage.style.display = "block";
+  }
+
+  function renderFaces(faces) {
+    facesEl.replaceChildren();
+    faces.forEach(function (f, i) {
+      var card = el("div", "face");
+      var h = el("h2", "", (i + 1) + ". " + f.emotion + " ");
+      h.appendChild(el("span", "", Math.round(f.confidence * 100) + "%"));
+      card.appendChild(h);
+      if (f.gradcam) {
+        var img = el("img");
+        img.alt = "Grad-CAM++ heatmap for face " + (i + 1);
+        img.src = "data:image/png;base64," + f.gradcam;
+        card.appendChild(img);
+      }
+      Object.keys(f.probabilities).forEach(function (name) {
+        var p = f.probabilities[name];
+        var row = el("div", "row");
+        var bar = el("div", "bar");
+        var fill = el("i");
+        fill.style.width = (p * 100).toFixed(1) + "%";
+        bar.appendChild(fill);
+        row.appendChild(el("span", "", name));
+        row.appendChild(bar);
+        row.appendChild(el("span", "num", (p * 100).toFixed(0) + "%"));
+        card.appendChild(row);
+      });
+      facesEl.appendChild(card);
+    });
+  }
+
+  fileInput.addEventListener("change", async function () {
+    var file = fileInput.files[0];
+    if (!file) return;
+    facesEl.replaceChildren();
+    stage.style.display = "none";
+    setStatus("Analyzing...", false);
+    var body = new FormData();
+    body.append("file", file);
+    try {
+      var res = await fetch("/predict?explain=" + explain.checked, { method: "POST", body: body });
+      if (!res.ok) {
+        setStatus(MESSAGES[res.status] || "Something went wrong (" + res.status + ").", true);
+        return;
+      }
+      var data = await res.json();
+      renderFaces(data.faces);
+      try {
+        drawImage(await createImageBitmap(file, { imageOrientation: "from-image" }), data.faces);
+      } catch (e) {
+        // The server decoded it; this browser just can't draw it (e.g. WebP on old Safari).
+        stage.style.display = "none";
+      }
+      setStatus(
+        data.faces.length
+          ? data.faces.length + " face(s) found in " + Math.round(data.timings_ms.total) + " ms."
+          : "No face found. Try a clearer, front-facing photo.",
+        false
+      );
+    } catch (e) {
+      setStatus("Could not reach the server.", true);
+    }
+  });
+})();
+</script>
+</body>
+</html>

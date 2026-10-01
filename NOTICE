@@ -1,0 +1,15 @@
+Third-party material used by this project
+
+FER-2013 dataset
+  Goodfellow et al., "Challenges in Representation Learning: A report on three
+  machine learning contests", ICML 2013 workshop. The training CSV comes from
+  the Kaggle mirror deadskull7/fer2013 (listed there as CC0). The dataset is
+  not redistributed in this repository.
+
+YuNet face detector (face_detection_yunet_2023mar.onnx)
+  From the OpenCV Zoo, https://github.com/opencv/opencv_zoo, MIT License.
+  Downloaded at build time; not stored in this repository.
+
+Test fixture tests/serving/fixtures/face.jpg
+  A crop of a NASA astronaut portrait (public domain) distributed with
+  scikit-image.
