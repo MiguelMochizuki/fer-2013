@@ -22,7 +22,9 @@ export const S = {
   privacy: "The photo never leaves your device.",
   loadingModel: (loaded, total) => `Downloading the model, ${formatBytes(loaded)} of ${formatBytes(total)}`,
   detecting: "Looking for faces",
-  result: (n, ms) => (n === 1 ? `1 face found in ${Math.round(ms)} ms.` : `${n} faces found in ${Math.round(ms)} ms.`),
+  result: (n, ms, capped) =>
+    capped ? `Showing the ${n} most confident faces (the limit), found in ${Math.round(ms)} ms.` : n === 1 ? `1 face found in ${Math.round(ms)} ms.` : `${n} faces found in ${Math.round(ms)} ms.`,
+  stripAria: "Pick a face",
   noFace: "No face found.",
   noFaceTips: "Try a sharper, front-facing photo with even light.",
   faceLabel: (i) => `Face ${i}`,

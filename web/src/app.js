@@ -14,7 +14,7 @@ const els = {
   photo: $("photo"), canvas: $("canvas"), boxes: $("boxes"),
   progress: $("progress"), progressFill: $("progressFill"), status: $("status"),
   error: $("error"), errorText: $("errorText"), retry: $("retry"),
-  faces: $("faces"), timings: $("timings"), plate: $("plate"),
+  strip: $("strip"), faces: $("faces"), timings: $("timings"), plate: $("plate"),
 };
 
 // ---- static text ----
@@ -123,9 +123,11 @@ function showError(code) {
   setStatus("");
 }
 function clearResults() {
+  els.strip.replaceChildren();
+  els.strip.hidden = true;
   els.faces.replaceChildren();
   els.boxes.replaceChildren();
-  els.boxes.classList.remove("in", "dim");
+  els.boxes.classList.remove("in", "multi");
   els.timings.hidden = true;
   els.timings.replaceChildren();
   els.error.hidden = true;
@@ -157,10 +159,9 @@ function paint(canvas, imageData) {
   canvas.getContext("2d").putImageData(imageData, 0, 0);
 }
 
-function buildCard(face, i, box) {
+function buildCard(face, i) {
   const index = i + 1;
   const card = h("li", "face");
-  card.tabIndex = 0;
   card.style.setProperty("--i", String(Math.min(i, 5)));
   card.setAttribute("aria-label", `${S.faceLabel(index)}: ${S.emotions[face.emotion]}, ${Math.round(face.confidence * 100)}%`);
 
@@ -195,23 +196,24 @@ function buildCard(face, i, box) {
   });
   card.append(words, views);
 
-  const highlight = (on) => {
-    box.classList.toggle("active", on);
-    card.classList.toggle("active", on);
-    els.boxes.classList.toggle("dim", on);
-  };
-  if (matchMedia("(hover: hover) and (pointer: fine)").matches) {
-    card.addEventListener("mouseenter", () => highlight(true));
-    card.addEventListener("mouseleave", () => highlight(false));
-  }
-  card.addEventListener("focusin", () => highlight(true));
-  card.addEventListener("focusout", () => highlight(false));
   return card;
 }
 
+const MAX_FACES = 10; // the detector's cap, same as the API
+
 function renderResult(result) {
   const { width, height } = result.image;
+  const many = result.faces.length > 1;
   const cards = [];
+  const boxes = [];
+  const picks = [];
+  const select = (index) => {
+    cards.forEach((card, k) => {
+      card.hidden = k !== index;
+      boxes[k].classList.toggle("active", k === index);
+      picks[k]?.setAttribute("aria-pressed", String(k === index));
+    });
+  };
   result.faces.forEach((face, i) => {
     const box = h("div", "box");
     box.style.left = `${(face.box.x / width) * 100}%`;
@@ -220,10 +222,26 @@ function renderResult(result) {
     box.style.height = `${(face.box.h / height) * 100}%`;
     box.append(h("span", "tag", String(i + 1)));
     els.boxes.append(box);
-    const card = buildCard(face, i, box);
+    boxes.push(box);
+    const card = buildCard(face, i);
     els.faces.append(card);
     cards.push(card);
+    if (many) {
+      const pick = h("button", "pick");
+      pick.type = "button";
+      pick.setAttribute("aria-label", `${S.faceLabel(i + 1)}: ${S.emotions[face.emotion]}`);
+      const thumb = h("canvas");
+      paint(thumb, grayToImageData(face.crop.gray, face.crop.w, face.crop.h));
+      pick.append(thumb, h("span", "pick-n", String(i + 1)));
+      pick.addEventListener("click", () => select(i));
+      box.addEventListener("click", () => select(i));
+      els.strip.append(pick);
+      picks.push(pick);
+    }
   });
+  els.strip.hidden = !many;
+  els.boxes.classList.toggle("multi", many);
+  select(0);
   els.canvas.setAttribute("aria-label", S.stageLabel(result.faces.length));
 
   const t = result.timings;
@@ -238,7 +256,7 @@ function renderResult(result) {
   els.timings.append(backend);
   els.timings.hidden = false;
 
-  setStatus(result.faces.length === 0 ? `${S.noFace} ${S.noFaceTips}` : S.result(result.faces.length, t.total));
+  setStatus(result.faces.length === 0 ? `${S.noFace} ${S.noFaceTips}` : S.result(result.faces.length, t.total, result.faces.length >= MAX_FACES));
   return nextFrame().then(() => {
     els.boxes.classList.add("in");
     cards.forEach((c) => c.classList.add("in"));
