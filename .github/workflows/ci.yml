@@ -27,7 +27,7 @@ jobs:
         run: ONLY_YUNET=1 scripts/fetch_models.sh models serving/models.sha256
       - run: uv run pytest -q -m "not slow"
 
-  # Needs the models Release (tag models-v1.0.0) and a complete serving/models.sha256.
+  # Needs the models Release (tag models-v1.1.0) and a complete serving/models.sha256.
   # Enable it by setting the repository variable DOCKER_BUILD=true. While it is
   # off, deploy is skipped too, so nothing ships without this smoke test.
   docker:
