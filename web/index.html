@@ -20,47 +20,45 @@
   </header>
 
   <main id="app" data-state="idle">
-    <section class="intro">
+    <section class="intro" id="drop">
       <h1 data-s="title"></h1>
       <p class="lede" data-s="lede"></p>
+      <div class="actions">
+        <button class="btn btn-primary" id="choose" type="button" data-s="choosePhoto"></button>
+        <button class="btn btn-quiet" id="example" type="button" data-s="tryExample"></button>
+      </div>
+      <p class="hint"><span data-s="dropHint"></span> <span data-s="formats"></span></p>
+      <p class="hint" data-s="privacy"></p>
     </section>
 
-    <div class="workspace">
-      <section class="stage" aria-label="Foto">
-        <div class="drop" id="drop">
-          <span class="icon icon-upload" aria-hidden="true"></span>
-          <div class="actions">
-            <button class="btn btn-primary" id="choose" type="button" data-s="choosePhoto"></button>
-            <button class="btn" id="example" type="button" data-s="tryExample"></button>
-          </div>
-          <p class="drop-hint" data-s="dropHint"></p>
-          <p class="hint" data-s="formats"></p>
-          <p class="privacy" data-s="privacy"></p>
-        </div>
+    <section class="stage" aria-label="Foto">
+      <button class="plate" id="plate" type="button" aria-label="Analisar a foto de exemplo">
+        <img src="examples/astronaut.jpg" alt="" width="551" height="552">
+        <span class="plate-box" aria-hidden="true"></span>
+        <span class="plate-cap" data-s="plateCaption"></span>
+      </button>
 
-        <div class="photo" id="photo" hidden>
-          <canvas id="canvas" role="img"></canvas>
-          <div class="boxes" id="boxes"></div>
-        </div>
+      <div class="photo" id="photo" hidden>
+        <canvas id="canvas" role="img"></canvas>
+        <div class="boxes" id="boxes"></div>
+      </div>
 
-        <div class="progress" id="progress" hidden>
-          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-        </div>
+      <div class="progress" id="progress" hidden>
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
 
-        <p class="status" id="status" role="status" aria-live="polite"></p>
-        <div class="error" id="error" role="alert" hidden>
-          <span class="icon icon-warning" aria-hidden="true"></span>
-          <p id="errorText"></p>
-          <button class="btn" id="retry" type="button" data-s="retry" hidden></button>
-        </div>
-      </section>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <div class="error" id="error" role="alert" hidden>
+        <span class="icon icon-warning" aria-hidden="true"></span>
+        <p id="errorText"></p>
+        <button class="btn" id="retry" type="button" data-s="retry" hidden></button>
+      </div>
+    </section>
 
-      <section class="results" aria-label="Resultados">
-        <ol class="faces" id="faces"></ol>
-        <dl class="timings" id="timings" hidden></dl>
-        <p class="backend" id="backend" hidden></p>
-      </section>
-    </div>
+    <section class="results" aria-label="Resultados">
+      <ol class="faces" id="faces"></ol>
+      <dl class="timings" id="timings" hidden></dl>
+    </section>
 
     <p class="note"><span data-s="limitation"></span> <a href="https://github.com/MiguelMochizuki/fer-2013#limitations-and-privacy" rel="noopener" data-s="limitationLink"></a></p>
   </main>
