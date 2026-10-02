@@ -13,7 +13,8 @@ Facial expression recognition on the [FER-2013](https://www.kaggle.com/datasets/
 3. **Train**: fine-tune an ImageNet-pretrained ResNet18 with a weighted sampler and weighted loss to counter class imbalance, early stopping on validation macro-F1.
 4. **Evaluate**: run the best checkpoint on a split, produce metrics, a confusion matrix, and precision-recall curves.
 5. **Explain**: run Grad-CAM++ on the same checkpoint to see which regions of the face drive correct and incorrect predictions.
-6. **Serve**: export the checkpoint to ONNX and run it behind a FastAPI app (see [API](#api)). The service detects faces in a photo, classifies each one and can return the Grad-CAM++ heatmap, without PyTorch in the runtime image.
+6. **Calibrate**: fit a single temperature on the validation split so the reported confidences match how often the model is right.
+7. **Serve**: export the checkpoint to ONNX and run it behind a FastAPI app (see [API](#api)). The service detects faces in a photo, classifies each one and can return the Grad-CAM++ heatmap, without PyTorch in the runtime image.
 
 ## Setup
 
@@ -53,8 +54,11 @@ uv run python scripts/evaluate.py --checkpoint checkpoints/best.pt --split test
 # 5. Explain predictions with Grad-CAM++
 uv run python scripts/gradcam_report.py --checkpoint checkpoints/best.pt --split test
 
-# 6. Export to ONNX for the API (see the API section)
-uv run python scripts/export_onnx.py --checkpoint checkpoints/best.pt --out-dir models/
+# 6. Calibrate the confidences (writes reports/calibration.json and a reliability diagram)
+uv run python scripts/calibrate.py --checkpoint checkpoints/best.pt
+
+# 7. Export to ONNX for the API with that temperature (see the API section)
+uv run python scripts/export_onnx.py --checkpoint checkpoints/best.pt --out-dir models/ --calibration reports/calibration.json
 ```
 
 Training writes checkpoints to `checkpoints/`, TensorBoard logs to `runs/`, and a per-epoch history JSON to `reports/`. View training progress with:
@@ -162,6 +166,29 @@ Regenerate with:
 uv run python scripts/gradcam_report.py --checkpoint checkpoints/best.pt --split test
 ```
 
+### Calibration
+
+The model is overconfident: on the test set 38.3% of its predictions come with a confidence above 0.99, and its mean confidence is 0.876 against a 0.707 accuracy. Temperature scaling divides the logits by one scalar before the softmax, which changes the confidences but never the predicted class, so accuracy is untouched. The temperature is fitted on the validation split only (T = 2.40, 3,589 images) and evaluated on the test set.
+
+| Split | Probabilities | Accuracy | ECE | NLL | Brier | Mean confidence |
+|-------|---------------|----------|-----|-----|-------|-----------------|
+| val | softmax | 0.688 | 0.185 | 1.319 | 0.491 | 0.873 |
+| val | T = 2.40 | 0.688 | 0.016 | 0.917 | 0.434 | 0.684 |
+| test | softmax | 0.707 | 0.168 | 1.209 | 0.461 | 0.876 |
+| test | T = 2.40 | 0.707 | 0.022 | 0.867 | 0.415 | 0.687 |
+
+ECE is the expected calibration error of the top-label confidence over 15 bins; NLL and Brier are proper scoring rules, lower is better. After calibration the confidence tracks accuracy: in the exported model's test predictions, accuracy is 0.939 when confidence is at least 0.9 (725 images), 0.835 between 0.7 and 0.9 (1,095), 0.630 between 0.5 and 0.7 (939) and 0.427 below 0.5 (830).
+
+![Reliability diagram](docs/images/reliability_diagram.png)
+
+Limits: a single temperature cannot fix everything. The middle of the curve ends up slightly under-confident, and training used balanced sampling, so per-class biases from that prior shift are not corrected. The calibration holds for data like FER-2013's validation split, not necessarily for photos from another population.
+
+Regenerate with:
+
+```bash
+uv run python scripts/calibrate.py --checkpoint checkpoints/best.pt
+```
+
 ## API
 
 A FastAPI service wraps the trained model: upload a photo, get one result per detected face (box, emotion, probabilities and, on request, a Grad-CAM++ heatmap). Inference runs on ONNX Runtime, so the image has no PyTorch in it.
@@ -184,7 +211,7 @@ curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
 }
 ```
 
-`GET /` is a small demo page, `GET /docs` the OpenAPI UI, `GET /health` reports the loaded model hash. Faces are found with [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) (MIT).
+`probabilities` and `confidence` are calibrated (see Calibration). `GET /` is a small demo page, `GET /docs` the OpenAPI UI, `GET /health` reports the loaded model hash and its calibration temperature (`null` for models exported before calibration existed). Faces are found with [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) (MIT).
 
 ### Run it
 
@@ -202,11 +229,11 @@ docker build -t fer-api .
 docker run --rm -p 7860:7860 fer-api
 ```
 
-To publish a new model: run the export, `gh release create models-vX.Y.Z models/fer_resnet18.onnx models/fer_fc_weight.npy` (model releases use `models-v*` tags so they don't trigger the app's `v*` deploy; bump major when the serving contract changes, such as architecture, input normalization or labels, minor for a retrain, patch for a re-export), append their `sha256sum` lines to `serving/models.sha256`, and point `RELEASE_URL` in the `Dockerfile` at the new tag. CI tests, builds the image and smoke tests it. The image runs anywhere Docker does; the hosting target for the public demo is not decided yet.
+To publish a new model: run `scripts/calibrate.py` and the export with `--calibration`, `gh release create models-vX.Y.Z models/fer_resnet18.onnx models/fer_fc_weight.npy` (model releases use `models-v*` tags so they don't trigger the app's `v*` deploy; bump major when the serving contract changes, such as architecture, input normalization or labels, minor for a retrain, patch for a re-export), append their `sha256sum` lines to `serving/models.sha256`, and point `RELEASE_URL` in the `Dockerfile` at the new tag. CI tests, builds the image and smoke tests it. The image runs anywhere Docker does; the hosting target for the public demo is not decided yet.
 
 ### Grad-CAM++ without PyTorch
 
-The head is `avgpool -> Dropout -> Linear`, so in eval mode the gradient of a class logit with respect to the `layer4` activations is constant over space (`w_k / 49`). Plugging that into the Grad-CAM++ weights gives a closed form that needs only the activations and the `Linear` weights, both available from the ONNX model, so the API computes it in numpy. This holds only for this head. `tests/serving/test_gradcam.py` checks it against `pytorch-grad-cam` for every class (correlation above 0.999), and would fail if the architecture changed.
+The head is `avgpool -> Dropout -> Linear`, so in eval mode the gradient of a class logit with respect to the `layer4` activations is constant over space (`w_k / 49`). Plugging that into the Grad-CAM++ weights gives a closed form that needs only the activations and the `Linear` weights, both available from the ONNX model, so the API computes it in numpy. This holds only for this head, and it uses the raw logits and weights: dividing them by the calibration temperature would change the heatmap, so only the probabilities are calibrated. `tests/serving/test_gradcam.py` checks it against `pytorch-grad-cam` for every class (correlation above 0.999), and would fail if the architecture changed.
 
 ### Performance
 
@@ -225,7 +252,7 @@ Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus 
 
 ### Limitations and privacy
 
-- The classifier reaches about 71% accuracy on FER-2013 (see Results) and inherits the dataset's biases: acted or web-scraped expressions, uneven demographics, noisy labels. Emotion labels from a face are not a reliable read of how someone feels. Do not use this for decisions about people.
+- The classifier reaches about 71% accuracy on FER-2013 (see Results), its confidences are calibrated on that dataset's validation split only, and it inherits the dataset's biases: acted or web-scraped expressions, uneven demographics, noisy labels. Emotion labels from a face are not a reliable read of how someone feels. Do not use this for decisions about people.
 - Faces from a detector are cropped square with a 10% margin before classification. On 1,476 FER test faces upscaled 4x (98% of 1,500 detected), classifying the detector crop scores 68.9% against 69.5% for the original 48x48 image on the same faces, and margins from 0% to 40% all land between 68.6% and 68.9%. So the crop costs about 0.6 points and the margin hardly matters. This is a proxy built from FER faces, not a benchmark on real photos.
 - Uploaded images are processed in memory and never written to disk or logged. Uploads are limited to 5 MB and JPEG, PNG or WebP.
 - The service is public and unauthenticated; it caps concurrent work and answers `503` when busy.
