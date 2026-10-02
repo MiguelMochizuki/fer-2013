@@ -92,7 +92,9 @@ _FILTERS = {
 }
 
 
-def _u8_case(name: str, img: Image.Image, size: tuple[int, int], filt: str) -> dict[str, Any]:
+def _u8_case(
+    name: str, img: Image.Image, size: tuple[int, int], filt: str
+) -> dict[str, Any]:
     src = np.asarray(img)
     out = np.asarray(img.resize(size, _FILTERS[filt]))
     return {
@@ -131,9 +133,14 @@ def build_resample() -> dict[str, Any]:
         "output_sha256": hashlib.sha256(capped.tobytes()).hexdigest(),
     }
 
-    face48 = np.asarray(gray.crop((50, 40, 185, 175)).resize((48, 48), _FILTERS["lanczos"]))
+    face48 = np.asarray(
+        gray.crop((50, 40, 185, 175)).resize((48, 48), _FILTERS["lanczos"])
+    )
     plane = face48.astype(np.float32) / np.float32(255.0)
-    big = np.asarray(Image.fromarray(plane, "F").resize((224, 224), _FILTERS["bicubic"]), dtype=np.float32)
+    big = np.asarray(
+        Image.fromarray(plane, "F").resize((224, 224), _FILTERS["bicubic"]),
+        dtype=np.float32,
+    )
     float_case = {
         "name": "f_48_to_224_bicubic",
         "kind": "f32",
@@ -147,7 +154,11 @@ def build_resample() -> dict[str, Any]:
         "output_b64": _b64(big),
     }
 
-    alpha = (np.arange(face.width * face.height) % 256).astype(np.uint8).reshape(face.height, face.width)
+    alpha = (
+        (np.arange(face.width * face.height) % 256)
+        .astype(np.uint8)
+        .reshape(face.height, face.width)
+    )
     rgba = np.dstack([np.asarray(face), alpha])
     gray_cases = [
         {
@@ -164,11 +175,22 @@ def build_resample() -> dict[str, Any]:
 
     cases = [
         cap_case,
-        _u8_case("l_135_to_48_lanczos", gray.crop((50, 40, 185, 175)), (48, 48), "lanczos"),
-        _u8_case("l_90x113_to_48_lanczos", gray.crop((60, 30, 150, 143)), (48, 48), "lanczos"),
-        _u8_case("l_24_to_48_lanczos", gray.crop((100, 100, 124, 124)), (48, 48), "lanczos"),
+        _u8_case(
+            "l_135_to_48_lanczos", gray.crop((50, 40, 185, 175)), (48, 48), "lanczos"
+        ),
+        _u8_case(
+            "l_90x113_to_48_lanczos", gray.crop((60, 30, 150, 143)), (48, 48), "lanczos"
+        ),
+        _u8_case(
+            "l_24_to_48_lanczos", gray.crop((100, 100, 124, 124)), (48, 48), "lanczos"
+        ),
         _u8_case("rgb_260_to_130_bilinear", face, (130, 130), "bilinear"),
-        _u8_case("l_90x113_to_30x50_bicubic", gray.crop((60, 30, 150, 143)), (30, 50), "bicubic"),
+        _u8_case(
+            "l_90x113_to_30x50_bicubic",
+            gray.crop((60, 30, 150, 143)),
+            (30, 50),
+            "bicubic",
+        ),
         float_case,
         *gray_cases,
     ]
