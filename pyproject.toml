@@ -3,6 +3,8 @@ name = "fer-2013"
 version = "0.1.0"
 description = "End-to-end data analysis and deep learning pipeline for FER-2013"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "MiguelMochizuki", email = "miguelmochizukisilva@gmail.com" }
 ]
