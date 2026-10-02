@@ -300,10 +300,12 @@ Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus 
 `web/` is a static site that runs the same pipeline in the browser: YuNet finds the faces, the ONNX classifier predicts the emotion with the calibrated probabilities, and Grad-CAM++ is computed in JavaScript. The photo never leaves the page. After the models load there are no network requests (the Network tab shows it). A Content-Security-Policy restricts the page itself; the worker that processes the pixels is same-origin code with no network calls, but GitHub Pages cannot send CSP headers for workers, so the browser does not enforce that part.
 
 How it works:
+- With several faces, a strip of crops lets you pick one at a time (or click its box on the photo); the reading, crop and heatmap follow the selection.
 - Plain ES modules, no bundler. `onnxruntime-web` runs in a Web Worker with WebAssembly and one thread, because GitHub Pages cannot send the headers that threads need.
 - Every stage is tested in Node against golden files written by the Python pipeline (`scripts/make_web_golden.py`): resampling is byte-identical to Pillow, detector boxes match OpenCV (IoU at least 0.999), probabilities and Grad-CAM++ maps agree within 1e-4. A Python test fails when the golden files go stale, and the site build fails when the models differ from the ones the golden files were made for.
 - The models are downloaded on first use, checked against their sha256 and kept in the browser cache, so later visits do not download them again.
 - Measured in Chromium on a desktop, with one face: detection about 11 ms, classification about 100 ms, Grad-CAM++ about 4 ms; three faces take about 400 ms in total. A first visit downloads about 59 MB (the 45 MB model and the 14 MB runtime).
+- PNGs with transparency: the browser's canvas stores premultiplied alpha, so fully transparent pixels reach the model as black, whereas Pillow keeps the stored RGB. Opaque images are unaffected.
 - A JPEG decoded by Chromium gives probabilities that differ from Pillow's by 6e-8 on the example photo, and the same box. Other browsers may decode JPEG slightly differently.
 
 Build and run it locally:
