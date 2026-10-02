@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { build } from "../build.mjs";
+import { assertSafeOutDir, build } from "../build.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const FAKE = {
@@ -35,7 +35,7 @@ test("monta dist com a página, módulos, fontes, ícones, runtime e manifesto",
   for (const f of [
     "index.html", "css/app.css", "src/app.js", "src/worker.js", "src/pipeline.js",
     "fonts/InstrumentSans-Variable.woff2", "fonts/LICENSE-InstrumentSans.txt", "icons/github-logo.svg", "icons/LICENSE-Phosphor.txt",
-    "examples/astronaut.jpg", "ort/ort.wasm.min.mjs", "ort/ort-wasm-simd-threaded.mjs", "ort/ort-wasm-simd-threaded.wasm",
+    "licenses/LICENSE-YuNet.txt", "licenses/LICENSE-onnxruntime.txt", "examples/astronaut.jpg", "ort/ort.wasm.min.mjs", "ort/ort-wasm-simd-threaded.mjs", "ort/ort-wasm-simd-threaded.wasm",
     "manifest.json",
   ]) assert.ok(existsSync(join(out, f)), `falta ${f}`);
   assert.equal(existsSync(join(out, "tests")), false, "testes não vão para o site");
@@ -78,4 +78,13 @@ test("falha com mensagem clara quando falta um modelo", async () => {
   const { rmSync } = await import("node:fs");
   rmSync(join(models, "fer_fc_weight.npy"));
   await assert.rejects(build({ modelsDir: models, outDir: out, metaPath }), /fer_fc_weight\.npy/);
+});
+
+test("assertSafeOutDir refuses the sources, the repo and their parents, and accepts a dist folder", () => {
+  const web = join(import.meta.dirname, "..");
+  for (const outDir of [web, join(web, ".."), join(web, "..", ".."), "/"]) {
+    assert.throws(() => assertSafeOutDir(outDir), /refus/i, outDir);
+  }
+  assert.doesNotThrow(() => assertSafeOutDir(join(web, "dist")));
+  assert.doesNotThrow(() => assertSafeOutDir(join(tmpdir(), "site")));
 });
