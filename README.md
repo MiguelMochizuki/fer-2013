@@ -21,7 +21,7 @@ Facial expression recognition with a ResNet18 trained on [FER-2013](https://www.
 | Shipped model: int8 (11 MB) versus fp32 (45 MB), full test set | 70.55% versus 70.80% accuracy, 96.3% identical predictions |
 | Face to result, in the browser (Chromium, one face) | about 150 ms: detection 20 to 30, classification 125, Grad-CAM++ 4 |
 | API latency (p50, one face, no CPU limit) | 10 ms, 14 ms with the heatmap |
-| Docker image | 438 MB on disk, 111 MB compressed (it was 742 MB and 209 MB) |
+| Docker image | 365 MB on disk, 94 MB compressed (it was 742 MB and 209 MB) |
 
 Details, per-class numbers and plots are in [Results](#results). The model is about 71% accurate on a noisy dataset: see [Limitations](#limitations-and-privacy) before reading anything into one prediction.
 
@@ -302,7 +302,7 @@ Latency measured with `scripts/benchmark.py` against the Docker image (a 260x260
 
 Restricted to the size of a typical free hosting tier (`docker run --cpus 0.1 --memory 512m`, 15 requests): about 1.3 s p50 without `explain` and 1.6 s with it, a boot of about 33 s, and 94 MiB of memory in use. It fits a 512 MB instance with room to spare. (With the fp32 model and OpenCV it was 1.8 to 2.0 s and 212 MiB.) The detector session is single-threaded on purpose: two ONNX Runtime threads busy-waiting on a tenth of a core made it three times slower.
 
-Classifier alone, one 224x224 image, 2 threads: int8 5.8 ms p50, fp32 17.2 ms, PyTorch 24.1 ms. The Docker image is 438 MB on disk and 111 MB compressed (162 MB of Python packages, 11 MB of models, the rest the Python base image). It has no OpenCV: YuNet runs on ONNX Runtime with the decoding and NMS in numpy (`serving/detector.py`), and a test checks its boxes against `cv2.FaceDetectorYN`. Together with the int8 model that took the image from 742 MB. An environment with PyTorch and its CUDA wheels is over 4 GB.
+Classifier alone, one 224x224 image, 2 threads: int8 5.8 ms p50, fp32 17.2 ms, PyTorch 24.1 ms. The Docker image is 365 MB on disk and 94 MB compressed (162 MB of Python packages, 11 MB of models, Python itself and a distroless base for the rest). The base is `gcr.io/distroless/cc-debian12:nonroot`: no shell, no package manager, running as a non-root user; the build copies in the Python runtime and only the shared libraries it needs. It has no OpenCV: YuNet runs on ONNX Runtime with the decoding and NMS in numpy (`serving/detector.py`), and a test checks its boxes against `cv2.FaceDetectorYN`. Together with the int8 model that took the image from 742 MB. An environment with PyTorch and its CUDA wheels is over 4 GB.
 
 ## Limitations and privacy
 
