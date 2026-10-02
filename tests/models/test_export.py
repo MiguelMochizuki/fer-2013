@@ -1,12 +1,11 @@
 from pathlib import Path
 
+import numpy as np
+import onnxruntime as ort
+import pytest
 from torchvision.models import ResNet
 
 from fer_2013.models import export
-
-import numpy as np
-import pytest
-import onnxruntime as ort
 
 
 def test_export_outputs_logits_and_features(onnx_models: tuple[Path, Path]) -> None:
@@ -36,7 +35,9 @@ def test_failed_parity_leaves_no_onnx_behind(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_export_adds_a_calibrated_probs_output(torch_model: ResNet, tmp_path: Path) -> None:
+def test_export_adds_a_calibrated_probs_output(
+    torch_model: ResNet, tmp_path: Path
+) -> None:
     onnx_path, _ = export.export_classifier(torch_model, tmp_path, temperature=2.5)
     sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
     assert [o.name for o in sess.get_outputs()] == ["logits", "features", "probs"]
@@ -49,7 +50,9 @@ def test_export_adds_a_calibrated_probs_output(torch_model: ResNet, tmp_path: Pa
     assert sess.get_modelmeta().custom_metadata_map["temperature"] == "2.5"
 
 
-def test_default_temperature_gives_plain_softmax(torch_model: ResNet, tmp_path: Path) -> None:
+def test_default_temperature_gives_plain_softmax(
+    torch_model: ResNet, tmp_path: Path
+) -> None:
     onnx_path, _ = export.export_classifier(torch_model, tmp_path)
     sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
     x = np.zeros((1, 3, 224, 224), dtype=np.float32)
@@ -58,6 +61,8 @@ def test_default_temperature_gives_plain_softmax(torch_model: ResNet, tmp_path: 
     assert probs.argmax() == logits.argmax()
 
 
-def test_non_positive_temperature_is_rejected(torch_model: ResNet, tmp_path: Path) -> None:
+def test_non_positive_temperature_is_rejected(
+    torch_model: ResNet, tmp_path: Path
+) -> None:
     with pytest.raises(ValueError):
         export.export_classifier(torch_model, tmp_path, temperature=0.0)

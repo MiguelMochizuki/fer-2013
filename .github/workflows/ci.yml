@@ -51,7 +51,7 @@ jobs:
       - name: Golden files are fresh
         run: uv run pytest tests/web -q
 
-  # Needs the models Release (tag models-v1.1.0) and a complete serving/models.sha256.
+  # Needs the models Release (tag models-v1.2.0) and a complete serving/models.sha256.
   # Enable it by setting the repository variable DOCKER_BUILD=true. While it is
   # off, the release job is skipped too, so nothing ships without this smoke test.
   docker:
