@@ -363,4 +363,4 @@ CI (`.github/workflows/ci.yml`) runs lint, format check, mypy and the tests on e
 
 ## License
 
-Released under the [GNU AGPL-3.0](LICENSE). The training data is the [FER-2013 mirror on Kaggle](https://www.kaggle.com/datasets/deadskull7/fer2013) (CC0); see [NOTICE](NOTICE) for third-party attributions.
+Released under the [MIT License](LICENSE) from v0.2.0. Earlier releases (v0.1.0 and v0.1.1) were published under the GNU AGPL-3.0 and stay under it. The training data is the [FER-2013 mirror on Kaggle](https://www.kaggle.com/datasets/deadskull7/fer2013) (CC0); see [NOTICE](NOTICE) for third-party attributions.
