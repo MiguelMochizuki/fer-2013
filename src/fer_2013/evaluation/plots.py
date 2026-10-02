@@ -88,6 +88,33 @@ def plot_training_curves(
     return out_path
 
 
+def plot_reliability_diagram(
+    curves: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]],
+    out_path: Path,
+    *,
+    dpi: int = DEFAULT_DPI,
+) -> Path:
+    """Accuracy against confidence, one curve per entry (from `reliability_bins`).
+
+    Points on the diagonal are perfectly calibrated; below it, over-confident.
+    """
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.plot([0, 1], [0, 1], "k--", linewidth=1, label="perfect calibration")
+    for name, (conf, acc, count) in curves.items():
+        filled = count > 0
+        ax.plot(conf[filled], acc[filled], marker="o", label=name)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_xlabel("confidence")
+    ax.set_ylabel("accuracy")
+    ax.set_title("Reliability diagram")
+    ax.legend(loc="upper left")
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=dpi)
+    plt.close(fig)
+    return out_path
+
+
 def plot_confusion_matrix(
     confusion: np.ndarray,
     out_path: Path,

@@ -195,6 +195,7 @@ def create_app(
             "status": "ok",
             "models": {
                 "classifier": app.state.classifier.sha,
+                "temperature": app.state.classifier.temperature,
                 "detector": type(app.state.detector).__name__,
             },
         }

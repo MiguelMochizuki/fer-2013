@@ -3,12 +3,14 @@
 
 Usage:
     uv run python scripts/export_onnx.py \\
-        --checkpoint checkpoints/best.pt --out-dir models/
+        --checkpoint checkpoints/best.pt --out-dir models/ \\
+        --calibration reports/calibration.json
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -24,6 +26,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export the classifier to ONNX.")
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, default=Path("models"))
+    parser.add_argument(
+        "--calibration",
+        type=Path,
+        default=None,
+        help="calibration.json from scripts/calibrate.py; without it the probs "
+        "output is a plain softmax (temperature 1).",
+    )
     return parser.parse_args(argv)
 
 
@@ -35,10 +44,21 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("checkpoint not found: %s", args.checkpoint)
         return 1
 
+    temperature = 1.0
+    if args.calibration is not None:
+        temperature = float(json.loads(args.calibration.read_text())["temperature"])
+    else:
+        logger.warning("no --calibration given: exporting with temperature 1.0")
+
     model = build_resnet18(num_classes=len(EMOTION_LABELS), pretrained=False)
     load_checkpoint(args.checkpoint, model)
-    onnx_path, fc_path = export_classifier(model, args.out_dir)
-    logger.info("wrote %s and %s (parity with PyTorch verified)", onnx_path, fc_path)
+    onnx_path, fc_path = export_classifier(model, args.out_dir, temperature)
+    logger.info(
+        "wrote %s and %s (temperature %.3f, parity with PyTorch verified)",
+        onnx_path,
+        fc_path,
+        temperature,
+    )
     return 0
 
 

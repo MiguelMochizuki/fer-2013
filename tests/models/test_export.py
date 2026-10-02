@@ -16,10 +16,11 @@ def test_export_outputs_logits_and_features(onnx_models: tuple[Path, Path]) -> N
     assert np.load(fc_path).shape == (7, 512)
 
     sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
-    assert [o.name for o in sess.get_outputs()] == ["logits", "features"]
+    assert [o.name for o in sess.get_outputs()] == ["logits", "features", "probs"]
     x = np.zeros((2, 3, 224, 224), dtype=np.float32)
-    logits, features = sess.run(None, {"input": x})
+    logits, features, probs = sess.run(None, {"input": x})
     assert logits.shape == (2, 7)
+    assert probs.shape == (2, 7)
     assert features.shape == (2, 512, 7, 7)
 
 
@@ -33,3 +34,30 @@ def test_failed_parity_leaves_no_onnx_behind(
     with pytest.raises(AssertionError):
         export.export_classifier(torch_model, tmp_path)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_export_adds_a_calibrated_probs_output(torch_model: ResNet, tmp_path: Path) -> None:
+    onnx_path, _ = export.export_classifier(torch_model, tmp_path, temperature=2.5)
+    sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+    assert [o.name for o in sess.get_outputs()] == ["logits", "features", "probs"]
+    x = np.random.default_rng(0).normal(size=(2, 3, 224, 224)).astype(np.float32)
+    logits, _, probs = sess.run(None, {"input": x})
+    z = logits / 2.5
+    expected = np.exp(z - z.max(axis=1, keepdims=True))
+    expected /= expected.sum(axis=1, keepdims=True)
+    assert np.allclose(probs, expected, atol=1e-5)
+    assert sess.get_modelmeta().custom_metadata_map["temperature"] == "2.5"
+
+
+def test_default_temperature_gives_plain_softmax(torch_model: ResNet, tmp_path: Path) -> None:
+    onnx_path, _ = export.export_classifier(torch_model, tmp_path)
+    sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+    x = np.zeros((1, 3, 224, 224), dtype=np.float32)
+    logits, _, probs = sess.run(None, {"input": x})
+    assert np.allclose(probs.sum(), 1.0)
+    assert probs.argmax() == logits.argmax()
+
+
+def test_non_positive_temperature_is_rejected(torch_model: ResNet, tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        export.export_classifier(torch_model, tmp_path, temperature=0.0)

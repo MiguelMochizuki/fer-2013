@@ -184,6 +184,7 @@ def test_health_reports_model_sha(client: TestClient, classifier: Classifier) ->
     body = client.get("/health").json()
     assert body["status"] == "ok"
     assert body["models"]["classifier"] == classifier.sha
+    assert body["models"]["temperature"] == classifier.temperature
 
 
 def test_exif_rotated_photo_is_upright_before_detect(
