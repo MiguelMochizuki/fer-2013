@@ -72,6 +72,7 @@ def _sha256(path: Path) -> str:
 
 
 def build_meta() -> dict[str, Any]:
+    """Versions and model hashes the golden files were made with; the site build compares against them."""
     pins = pinned_hashes()
     classifier = Classifier(
         MODELS_DIR / "fer_resnet18.onnx", MODELS_DIR / "fer_fc_weight.npy"
@@ -240,6 +241,7 @@ def cv_detect_floats(image: Image.Image) -> list[dict[str, float]]:
 
 
 def build_detector() -> dict[str, Any]:
+    """Reference boxes from OpenCV's FaceDetectorYN for every fixture, with float coordinates."""
     out: dict[str, Any] = {}
     for name in FIXTURE_NAMES:
         img = Image.open(FIXTURES_DIR / name).convert("RGB")
@@ -377,6 +379,7 @@ def build_golden() -> dict[str, Any]:
 
 
 def write_golden(out_dir: Path = GOLDEN_DIR) -> None:
+    """Write every golden file as sorted-key JSON into ``out_dir``."""
     out_dir.mkdir(parents=True, exist_ok=True)
     for name, content in build_golden().items():
         (out_dir / f"{name}.json").write_text(
@@ -431,6 +434,14 @@ def check_golden(golden_dir: Path = GOLDEN_DIR, tol: float = 1e-4) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the golden-file generator and freshness check command line tool.
+
+    Args:
+        argv: Arguments to parse; defaults to ``sys.argv[1:]``.
+
+    Returns:
+        Exit code: 0 on success, non-zero on failure.
+    """
     parser = argparse.ArgumentParser(
         description="Generate or check the web golden files."
     )

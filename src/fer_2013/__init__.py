@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from fer-2013!")
+"""Facial expression recognition on FER-2013: training, evaluation and a torch-free serving runtime."""

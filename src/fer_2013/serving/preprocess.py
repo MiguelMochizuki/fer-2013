@@ -19,6 +19,7 @@ FACE_SIZE = (48, 48)
 
 
 def to_gray(img: Image.Image) -> Image.Image:
+    """Convert to 8-bit grayscale, scaling 16-bit and float images to the full 0-255 range."""
     if img.mode.startswith("I") or img.mode == "F":
         a = np.asarray(img, dtype=np.float32)
         hi = 65535.0 if img.mode.startswith("I;16") else max(float(a.max()), 1.0)

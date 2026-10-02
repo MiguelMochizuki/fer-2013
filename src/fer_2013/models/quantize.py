@@ -52,6 +52,7 @@ class _Calibration(CalibrationDataReader):  # type: ignore[misc]
         )
 
     def get_next(self) -> dict[str, np.ndarray] | None:
+        """Return the next calibration batch as ``{"input": array}``, or None when done."""
         return next(self._batches, None)
 
 
@@ -77,6 +78,9 @@ def quantize_classifier(
             but no VNNI (many cloud machines, GitHub runners) saturate an int16 intermediate in
             ONNX Runtime and the model drifts badly (probabilities off by 0.26 on the CI runner);
             with it the result is bit-identical across CPUs.
+
+    Returns:
+        ``out_path``.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory() as tmp:

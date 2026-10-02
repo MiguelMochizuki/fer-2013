@@ -45,6 +45,7 @@ function clampBox(box, width, height) {
 }
 
 /**
+ * Wire the detector and the classifier into one `analyze(pixels, w, h)` function.
  * @param {{ ort: object, detectorSession: object, classifierSession: object, fcWeight: Float32Array }} deps
  */
 export function createPipeline({ ort, detectorSession, classifierSession, fcWeight }) {

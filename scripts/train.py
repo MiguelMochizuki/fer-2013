@@ -83,6 +83,14 @@ def _load_with_overrides(config_path: Path | None, overrides: list[str]) -> Conf
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the training command line tool.
+
+    Args:
+        argv: Arguments to parse; defaults to ``sys.argv[1:]``.
+
+    Returns:
+        Exit code: 0 on success, non-zero on failure.
+    """
     args = _parse_args(argv)
 
     logging.basicConfig(

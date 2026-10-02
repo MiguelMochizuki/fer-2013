@@ -78,6 +78,7 @@ export function nms(boxes, iouThreshold) {
 }
 
 /**
+ * Create a YuNet detector bound to an ONNX Runtime Web session of the dynamic-shape model.
  * @param {{ Tensor: new (type: string, data: Float32Array, dims: number[]) => object }} ort
  * @param {{ run(feeds: object): Promise<Record<string, { data: Float32Array }>> }} session
  * @param {{ scoreThreshold?: number, nmsThreshold?: number, maxSide?: number, maxFaces?: number }} [options]

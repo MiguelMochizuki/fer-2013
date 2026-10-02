@@ -35,6 +35,7 @@ class _WithFeatures(nn.Module):
     def forward(
         self, x: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Return the logits, the layer4 feature maps and the temperature-scaled probabilities."""
         m = self.m
         x = m.maxpool(m.relu(m.bn1(m.conv1(x))))
         feats = m.layer4(m.layer3(m.layer2(m.layer1(x))))
@@ -52,6 +53,9 @@ def export_classifier(
         out_dir: output directory.
         temperature: calibration temperature for the `probs` output (1.0 means
             a plain softmax).
+
+    Returns:
+        Paths of the ONNX model and of the fc weights ``.npy``.
 
     Raises:
         ValueError: `temperature` is not positive.

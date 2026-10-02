@@ -9,6 +9,7 @@ export const EMOTIONS = Object.freeze(["angry", "disgust", "fear", "happy", "sad
 const INPUT_LEN = 3 * 224 * 224;
 
 /**
+ * Wrap the classifier's ONNX Runtime Web session.
  * @param {{ Tensor: new (type: string, data: Float32Array, dims: number[]) => object }} ort
  * @param {{ run(feeds: object): Promise<Record<string, { data: Float32Array }>> }} session
  */

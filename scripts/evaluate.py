@@ -73,6 +73,14 @@ def _find_latest_history(reports_dir: Path) -> Path | None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the checkpoint evaluation command line tool.
+
+    Args:
+        argv: Arguments to parse; defaults to ``sys.argv[1:]``.
+
+    Returns:
+        Exit code: 0 on success, non-zero on failure.
+    """
     args = _parse_args(argv)
 
     logging.basicConfig(
