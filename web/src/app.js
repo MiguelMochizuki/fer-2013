@@ -14,15 +14,12 @@ const els = {
   photo: $("photo"), canvas: $("canvas"), boxes: $("boxes"),
   progress: $("progress"), progressFill: $("progressFill"), status: $("status"),
   error: $("error"), errorText: $("errorText"), retry: $("retry"),
-  faces: $("faces"), timings: $("timings"), backend: $("backend"),
+  faces: $("faces"), timings: $("timings"), plate: $("plate"),
 };
 
 // ---- static text ----
 for (const node of document.querySelectorAll("[data-s]")) node.textContent = S[node.dataset.s];
 document.title = S.title;
-const retryIcon = document.createElement("span");
-retryIcon.className = "icon icon-retry";
-retryIcon.setAttribute("aria-hidden", "true");
 
 function h(tag, className, text) {
   const node = document.createElement(tag);
@@ -103,11 +100,10 @@ let lastBlob = null;
 
 function setState(state) {
   app.dataset.state = state;
-  els.drop.classList.toggle("compact", !els.photo.hidden);
 }
 function setBusy(value) {
   busy = value;
-  els.choose.disabled = els.example.disabled = value || !supported;
+  els.choose.disabled = els.example.disabled = els.plate.disabled = value || !supported;
 }
 function setStatus(text) {
   els.status.textContent = text;
@@ -131,7 +127,6 @@ function clearResults() {
   els.boxes.classList.remove("in", "dim");
   els.timings.hidden = true;
   els.timings.replaceChildren();
-  els.backend.hidden = true;
   els.error.hidden = true;
   els.photo.hidden = true;
   els.photo.classList.remove("in");
@@ -168,46 +163,28 @@ function buildCard(face, i, box) {
   card.style.setProperty("--i", String(Math.min(i, 5)));
   card.setAttribute("aria-label", `${S.faceLabel(index)}: ${S.emotions[face.emotion]}, ${Math.round(face.confidence * 100)}%`);
 
-  const thumb = h("div", "thumb");
-  thumb.dataset.view = "orig";
-  const frame = h("div", "thumb-frame");
-  const orig = h("canvas", "layer-orig");
+  const verdict = h("header", "verdict");
+  verdict.append(h("p", "face-title", S.faceLabel(index)), h("p", "emotion", S.emotions[face.emotion]), h("span", "confidence", `${Math.round(face.confidence * 100)}%`));
+
+  const views = h("div", "views");
+  const figure = (canvas, caption) => {
+    const fig = h("figure", "view");
+    fig.append(canvas, h("figcaption", "", caption));
+    return fig;
+  };
+  const orig = h("canvas");
   orig.setAttribute("role", "img");
   orig.setAttribute("aria-label", S.faceLabel(index));
   paint(orig, grayToImageData(face.crop.gray, face.crop.w, face.crop.h));
-  frame.append(orig);
-  const toggle = h("div", "toggle");
-  toggle.setAttribute("role", "group");
-  toggle.setAttribute("aria-label", S.faceLabel(index));
-  const bOrig = h("button", "", S.original);
-  bOrig.type = "button";
-  bOrig.setAttribute("aria-pressed", "true");
-  toggle.append(bOrig);
+  views.append(figure(orig, S.original));
   if (face.heatmap) {
-    const heat = h("canvas", "layer-heat");
+    const heat = h("canvas");
     heat.setAttribute("role", "img");
     heat.setAttribute("aria-label", S.heatmapAlt(index, S.emotions[face.emotion]));
     paint(heat, new ImageData(face.heatmap, 128, 128));
-    frame.append(heat);
-    const bHeat = h("button", "", S.heatmap);
-    bHeat.type = "button";
-    bHeat.setAttribute("aria-pressed", "false");
-    const view = (name) => {
-      thumb.dataset.view = name;
-      bOrig.setAttribute("aria-pressed", String(name === "orig"));
-      bHeat.setAttribute("aria-pressed", String(name === "heat"));
-    };
-    bOrig.addEventListener("click", () => view("orig"));
-    bHeat.addEventListener("click", () => view("heat"));
-    toggle.append(bHeat);
+    views.append(figure(heat, S.heatmap));
   }
-  thumb.append(frame, toggle);
 
-  const info = h("div", "info");
-  const verdict = h("div", "verdict");
-  const names = h("div");
-  names.append(h("p", "face-title", S.faceLabel(index)), h("p", "emotion", S.emotions[face.emotion]));
-  verdict.append(names, h("span", "confidence", `${Math.round(face.confidence * 100)}%`));
   const probs = h("ul", "probs");
   rankProbabilities(face.probabilities).forEach(({ label, p }, rank) => {
     const row = h("li", rank === 0 ? "prob top" : "prob");
@@ -216,8 +193,7 @@ function buildCard(face, i, box) {
     row.append(h("span", "name", S.emotions[label]), fill, h("span", "pct", `${Math.round(p * 100)}%`));
     probs.append(row);
   });
-  info.append(verdict, probs);
-  card.append(thumb, info);
+  card.append(verdict, views, probs);
 
   const highlight = (on) => {
     box.classList.toggle("active", on);
@@ -257,9 +233,10 @@ function renderResult(result) {
     cell.append(h("dt", "", label), h("dd", "", value));
     els.timings.append(cell);
   }
+  const backend = h("div");
+  backend.append(h("dt", "", S.timings.runtime), h("dd", "", S.backend));
+  els.timings.append(backend);
   els.timings.hidden = false;
-  els.backend.textContent = S.backend;
-  els.backend.hidden = false;
 
   setStatus(result.faces.length === 0 ? `${S.noFace} ${S.noFaceTips}` : S.result(result.faces.length, t.total));
   return nextFrame().then(() => {
@@ -320,34 +297,42 @@ els.file.addEventListener("change", () => {
   els.file.value = "";
   run(file);
 });
-els.example.addEventListener("click", async () => {
+async function runExample() {
   try {
     const response = await fetch("examples/astronaut.jpg");
+    if (!response.ok) throw new Error(String(response.status));
     run(await response.blob());
   } catch {
-    showError("decode");
+    setState("error");
+    showError("download");
   }
-});
+}
+els.example.addEventListener("click", runExample);
+els.plate.addEventListener("click", runExample);
 els.retry.addEventListener("click", () => run(lastBlob));
-for (const button of [els.choose, els.example]) {
+for (const button of [els.choose, els.example, els.plate]) {
   button.addEventListener("pointerenter", prefetch);
   button.addEventListener("focus", prefetch);
 }
+// the whole page is the drop target; always cancel the default so a miss never navigates away
 for (const type of ["dragenter", "dragover"]) {
-  els.drop.addEventListener(type, (e) => {
+  document.addEventListener(type, (e) => {
     e.preventDefault();
-    els.drop.classList.add("over");
+    document.body.classList.add("over");
   });
 }
-for (const type of ["dragleave", "drop"]) els.drop.addEventListener(type, () => els.drop.classList.remove("over"));
-els.drop.addEventListener("drop", (e) => {
+document.addEventListener("dragleave", (e) => {
+  if (!e.relatedTarget) document.body.classList.remove("over");
+});
+document.addEventListener("drop", (e) => {
   e.preventDefault();
+  document.body.classList.remove("over");
   run(e.dataTransfer?.files?.[0]);
 });
 
 if (!supported) {
   setBusy(false);
   showError("unsupported");
-  els.choose.disabled = els.example.disabled = true;
+  els.choose.disabled = els.example.disabled = els.plate.disabled = true;
 }
 setState("idle");
