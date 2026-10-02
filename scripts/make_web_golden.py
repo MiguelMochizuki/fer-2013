@@ -27,7 +27,10 @@ import numpy as np
 import PIL
 from PIL import Image
 
+from fer_2013.serving.api import _clamp
 from fer_2013.serving.classifier import Classifier
+from fer_2013.serving.detector import YuNetDetector
+from fer_2013.serving.preprocess import MEAN, RESIZE_TO, STD, crop_gray, to_input
 
 ROOT = Path(__file__).resolve().parents[1]
 MODELS_DIR = ROOT / "models"
@@ -240,12 +243,56 @@ def build_detector() -> dict[str, Any]:
     return {"fixtures": out}
 
 
+def build_preprocess() -> dict[str, Any]:
+    """Per detected face: the clamped box, the gray crop, the 48x48 face and the 224x224 plane."""
+    detector = YuNetDetector(MODELS_DIR / "face_detection_yunet_2023mar.onnx")
+    out: dict[str, Any] = {}
+    for name in FIXTURE_NAMES:
+        img = Image.open(FIXTURES_DIR / name).convert("RGB")
+        faces = []
+        for raw in detector.detect(img):
+            box = _clamp(raw, img.width, img.height)
+            gray = crop_gray(img, box) if box is not None else None
+            if box is None or gray is None:
+                continue
+            face48 = (
+                gray
+                if gray.size == (48, 48)
+                else gray.resize((48, 48), _FILTERS["lanczos"])
+            )
+            x = np.asarray(face48, dtype=np.float32) / np.float32(255.0)
+            plane = np.asarray(
+                Image.fromarray(x, "F").resize(RESIZE_TO, _FILTERS["bicubic"]),
+                dtype=np.float32,
+            )
+            tensor = to_input(gray)[0]
+            reference = (
+                plane[None] - np.asarray(MEAN, np.float32)[:, None, None]
+            ) / np.asarray(STD, np.float32)[:, None, None]
+            assert np.allclose(tensor, reference, atol=1e-6), (
+                "plane/normalization out of sync"
+            )
+            faces.append(
+                {
+                    "box": {"x": box.x, "y": box.y, "w": box.w, "h": box.h},
+                    "crop_w": gray.width,
+                    "crop_h": gray.height,
+                    "crop_b64": _b64(np.asarray(gray)),
+                    "face48_b64": _b64(np.asarray(face48)),
+                    "plane224_b64": _b64(plane),
+                }
+            )
+        out[name] = {"w": img.width, "h": img.height, "faces": faces}
+    return {"fixtures": out}
+
+
 def build_golden() -> dict[str, Any]:
     """Section name -> JSON-serializable content. Binary data goes in `*_b64` fields."""
     return {
         "meta": build_meta(),
         "resample": build_resample(),
         "detector": build_detector(),
+        "preprocess": build_preprocess(),
     }
 
 
