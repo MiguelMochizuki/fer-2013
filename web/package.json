@@ -1,0 +1,14 @@
+{
+  "name": "fer-2013-web",
+  "private": true,
+  "type": "module",
+  "description": "Browser demo for the FER-2013 emotion classifier",
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "AGPL-3.0-only",
+  "devDependencies": {
+    "onnxruntime-web": "1.30.0",
+    "pngjs": "7.0.0"
+  }
+}
