@@ -253,6 +253,7 @@ Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus 
 ### Limitations and privacy
 
 - The classifier reaches about 71% accuracy on FER-2013 (see Results), its confidences are calibrated on that dataset's validation split only, and it inherits the dataset's biases: acted or web-scraped expressions, uneven demographics, noisy labels. Emotion labels from a face are not a reliable read of how someone feels. Do not use this for decisions about people.
+- The confidence moves with the crop: three copies of the same face in one image got 73.5%, 78.7% and 80.6% (the browser and Python agree on all three), because the detector boxes differ by a few pixels.
 - Faces from a detector are cropped square with a 10% margin before classification. On 1,476 FER test faces upscaled 4x (98% of 1,500 detected), classifying the detector crop scores 68.9% against 69.5% for the original 48x48 image on the same faces, and margins from 0% to 40% all land between 68.6% and 68.9%. So the crop costs about 0.6 points and the margin hardly matters. This is a proxy built from FER faces, not a benchmark on real photos.
 - Uploaded images are processed in memory and never written to disk or logged. Uploads are limited to 5 MB and JPEG, PNG or WebP.
 - The service is public and unauthenticated; it caps concurrent work and answers `503` when busy.
@@ -264,8 +265,9 @@ Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus 
 How it works:
 - Plain ES modules, no bundler. `onnxruntime-web` runs in a Web Worker with WebAssembly and one thread, because GitHub Pages cannot send the headers that threads need.
 - Every stage is tested in Node against golden files written by the Python pipeline (`scripts/make_web_golden.py`): resampling is byte-identical to Pillow, detector boxes match OpenCV (IoU at least 0.999), probabilities and Grad-CAM++ maps agree within 1e-4. A Python test fails when the golden files go stale, and the site build fails when the models differ from the ones the golden files were made for.
-- The models are downloaded on first use, checked against their sha256 and kept in the browser cache, so later visits are instant and work offline.
-- Measured in Chromium on a desktop: detection about 11 ms, classification about 100 ms, Grad-CAM++ about 4 ms. A first visit downloads about 59 MB (the 45 MB model and the 14 MB runtime).
+- The models are downloaded on first use, checked against their sha256 and kept in the browser cache, so later visits do not download them again.
+- Measured in Chromium on a desktop, with one face: detection about 11 ms, classification about 100 ms, Grad-CAM++ about 4 ms; three faces take about 400 ms in total. A first visit downloads about 59 MB (the 45 MB model and the 14 MB runtime).
+- A JPEG decoded by Chromium gives probabilities that differ from Pillow's by 6e-8 on the example photo, and the same box. Other browsers may decode JPEG slightly differently.
 
 Build and run it locally:
 
