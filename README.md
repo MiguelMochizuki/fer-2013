@@ -1,22 +1,58 @@
 # FER-2013
 
-Facial expression recognition on the [FER-2013](https://www.kaggle.com/datasets/deadskull7/fer2013) dataset: a ResNet18 fine-tuned on 48x48 grayscale faces to classify one of seven emotions, with a full pipeline from raw CSV to trained model to evaluation report, and a torch-free FastAPI service that serves the model with face detection and Grad-CAM++ explanations.
+Facial expression recognition with a ResNet18 trained on [FER-2013](https://www.kaggle.com/datasets/deadskull7/fer2013): the full path from the raw CSV to a calibrated model, a torch-free API, and a demo that runs entirely in your browser.
 
-## Emotions
+**[Try the live demo](https://miguelmochizuki.github.io/fer-2013/)** · [API docs](#api) · [Results](#results) · [Limitations](#limitations-and-privacy)
 
-`angry`, `disgust`, `fear`, `happy`, `sad`, `surprise`, `neutral`
+![The browser demo: a photo with the detected face, the emotion typeset by probability, the crop and the Grad-CAM++ heatmap](docs/images/demo.png)
 
-## Pipeline
+## What is inside
+
+- **Training pipeline.** Download, preprocess, train (weighted sampler and loss against class imbalance, early stopping on validation macro-F1), evaluate, explain with Grad-CAM++ and calibrate with temperature scaling.
+- **API.** A FastAPI service on ONNX Runtime, with no PyTorch in the image. It finds faces with YuNet, classifies each one and can return the Grad-CAM++ heatmap.
+- **Browser demo.** The same pipeline in JavaScript on GitHub Pages: nothing is uploaded, and every stage is tested against golden files written by the Python code.
+
+## Results at a glance
+
+| | Value |
+|---|---|
+| Test accuracy / macro-F1 | 0.707 / 0.709 |
+| Calibration (test ECE, 15 bins) | 0.168 before, 0.022 after temperature scaling (T = 2.40) |
+| ONNX versus PyTorch, full test set | 70.80% versus 70.74%, 99.94% identical predictions |
+| Face to result, in the browser (Chromium, one face) | about 115 ms: detection 11, classification 100, Grad-CAM++ 4 |
+| API latency (p50, one face, no CPU limit) | 23 ms, 26 ms with the heatmap |
+
+Details, per-class numbers and plots are in [Results](#results). The model is about 71% accurate on a noisy dataset: see [Limitations](#limitations-and-privacy) before reading anything into one prediction.
+
+## Quick start
+
+**In the browser:** open the [live demo](https://miguelmochizuki.github.io/fer-2013/), pick a photo or use the sample.
+
+**The API, with Docker** (downloads the models from a GitHub Release and verifies their sha256 at build time):
+
+```bash
+docker build -t fer-api .
+docker run --rm -p 7860:7860 fer-api
+curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
+```
+
+**Train it yourself:** see [Training](#training). It needs Python 3.12 and [uv](https://docs.astral.sh/uv/).
+
+## How it works
 
 1. **Download**: fetch `fer2013.csv` from Kaggle.
 2. **Preprocess**: parse the CSV into `.npy` arrays, split into train/val/test.
-3. **Train**: fine-tune an ImageNet-pretrained ResNet18 with a weighted sampler and weighted loss to counter class imbalance, early stopping on validation macro-F1.
-4. **Evaluate**: run the best checkpoint on a split, produce metrics, a confusion matrix, and precision-recall curves.
-5. **Explain**: run Grad-CAM++ on the same checkpoint to see which regions of the face drive correct and incorrect predictions.
-6. **Calibrate**: fit a single temperature on the validation split so the reported confidences match how often the model is right.
-7. **Serve**: export the checkpoint to ONNX and run it behind a FastAPI app (see [API](#api)). The service detects faces in a photo, classifies each one and can return the Grad-CAM++ heatmap, without PyTorch in the runtime image.
+3. **Train**: fine-tune an ImageNet-pretrained ResNet18 (48x48 grayscale replicated to 3 channels) with a weighted sampler and weighted loss, early stopping on validation macro-F1.
+4. **Evaluate**: metrics, confusion matrix and precision-recall curves for the best checkpoint.
+5. **Explain**: Grad-CAM++ on the same checkpoint, to see which regions of the face drive correct and incorrect predictions.
+6. **Calibrate**: fit one temperature on the validation split so the reported confidences match how often the model is right.
+7. **Serve**: export to ONNX and run it behind the [API](#api) or in the [browser](#browser-demo).
 
-## Setup
+The seven emotions are `angry`, `disgust`, `fear`, `happy`, `sad`, `surprise` and `neutral`.
+
+## Training
+
+### Setup
 
 Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
@@ -33,7 +69,7 @@ KAGGLE_USERNAME=your-username
 KAGGLE_API_TOKEN=your-token
 ```
 
-## Usage
+### Usage
 
 ```bash
 # 1. Download the raw CSV
@@ -69,7 +105,7 @@ uv run tensorboard --logdir runs
 
 Evaluation writes metrics, prediction arrays, and plots (confusion matrix, PR curves, training curves) to `reports/`.
 
-## Configuration
+### Configuration
 
 Training is driven by a YAML config (`configs/default.yaml`):
 
@@ -250,7 +286,7 @@ Restricted to the size of a typical free hosting tier (`docker run --cpus 0.1 --
 
 Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus PyTorch 24.1 ms. The Docker image is 742 MB on disk (330 MB of Python packages, 43 MB of models); an environment with PyTorch and its CUDA wheels is over 4 GB.
 
-### Limitations and privacy
+## Limitations and privacy
 
 - The classifier reaches about 71% accuracy on FER-2013 (see Results), its confidences are calibrated on that dataset's validation split only, and it inherits the dataset's biases: acted or web-scraped expressions, uneven demographics, noisy labels. Emotion labels from a face are not a reliable read of how someone feels. Do not use this for decisions about people.
 - The confidence moves with the crop: three copies of the same face in one image got 73.5%, 78.7% and 80.6% (the browser and Python agree on all three), because the detector boxes differ by a few pixels.
@@ -280,6 +316,12 @@ python3 -m http.server -d web/dist 8000
 
 The site is published to GitHub Pages from `main` by `.github/workflows/pages.yml`. Pages is free for public repositories, with a soft limit of 100 GB of bandwidth per month, which is on the order of 1,500 first visits.
 
+## Releases and versioning
+
+- `v*` tags are the application (code, API image, site). Each creates a GitHub Release from CI.
+- `models-v*` tags are the trained weights. They are marked **pre-release** on purpose and must not be deleted: the `Dockerfile`, `scripts/fetch_models.sh`, CI and the Pages build download the weights from them, and `serving/models.sha256` pins their hashes.
+- Model versions follow semver in spirit: major when the serving contract changes (architecture, input normalization, labels), minor for a retrain, patch for a re-export.
+
 ## Development
 
 ```bash
@@ -289,13 +331,13 @@ uv run mypy                 # type check
 uv run pytest -q            # tests
 ```
 
-CI (`.github/workflows/ci.yml`) runs lint, format check, mypy and the tests on every push and pull request; once the model release exists it also builds the Docker image and smoke tests it with `scripts/smoke_test.sh`.
-
 Pre-commit hooks run lint and format on commit, and type checking plus the full test suite on push:
 
 ```bash
 uv run pre-commit install
 ```
+
+CI (`.github/workflows/ci.yml`) runs lint, format check, mypy and the tests on every push and pull request, builds the Docker image and smoke tests it with `scripts/smoke_test.sh`, and creates the GitHub Release on `v*` tags. The site has its own tests (`npm test --prefix web`) and workflow (`.github/workflows/pages.yml`).
 
 ## License
 
