@@ -64,6 +64,9 @@ function onMessage({ data }) {
   } else if (data.type === "error") {
     const error = { code: data.code };
     if (!ready) {
+      // ort keeps a module-level "failed" flag, so a retry needs a fresh worker.
+      worker?.terminate();
+      worker = null;
       initInFlight = false;
       readyDeferred?.reject(error);
     }
@@ -75,7 +78,8 @@ function startWorker() {
   if (worker) return;
   worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
   worker.onmessage = onMessage;
-  worker.onerror = () => onMessage({ data: { type: "error", code: "download" } });
+  worker.onerror = () =>
+    onMessage({ data: { type: "error", code: ready ? "inference" : "download" } });
 }
 
 /** Start (or join) the model download; safe to call repeatedly. */
