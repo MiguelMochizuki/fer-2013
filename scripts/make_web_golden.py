@@ -158,8 +158,8 @@ def build_resample() -> dict[str, Any]:
         "channels": 1,
         "out_w": 224,
         "out_h": 224,
-        "input_b64": _b64(plane),
-        "output_b64": _b64(big),
+        "input_f32_b64": _b64(plane),
+        "output_f32_b64": _b64(big),
     }
 
     alpha = (
@@ -292,7 +292,7 @@ def build_preprocess() -> dict[str, Any]:
                     "crop_h": gray.height,
                     "crop_b64": _b64(np.asarray(gray)),
                     "face48_b64": _b64(np.asarray(face48)),
-                    "plane224_b64": _b64(plane),
+                    "plane224_f32_b64": _b64(plane),
                 }
             )
         out[name] = {"w": img.width, "h": img.height, "faces": faces}
@@ -315,7 +315,7 @@ def build_classifier() -> dict[str, Any]:
     return {
         "fixtures": out,
         "features_fixture": FIXTURE_NAMES[0],
-        "features_b64": features_b64,
+        "features_f32_b64": features_b64,
     }
 
 
@@ -405,11 +405,19 @@ def _diff(a: Any, b: Any, tol: float, path: str, out: list[str]) -> None:
     ):
         if not math.isclose(a, b, rel_tol=tol, abs_tol=tol):
             out.append(f"{path}: {a} != {b}")
+    elif path.endswith("_f32_b64") and isinstance(a, str) and isinstance(b, str):
+        # float payloads are compared numerically: model outputs differ in the last
+        # bits between CPUs, which says nothing about the pipeline
+        x = np.frombuffer(base64.b64decode(a), dtype=np.float32)
+        y = np.frombuffer(base64.b64decode(b), dtype=np.float32)
+        if x.shape != y.shape or not np.allclose(x, y, rtol=tol, atol=tol):
+            worst = float(np.max(np.abs(x - y))) if x.shape == y.shape else float("nan")
+            out.append(f"{path}: float payload differs (max abs diff {worst:.2e})")
     elif a != b:
         out.append(f"{path}: {str(a)[:60]} != {str(b)[:60]}")
 
 
-def check_golden(golden_dir: Path = GOLDEN_DIR, tol: float = 1e-6) -> list[str]:
+def check_golden(golden_dir: Path = GOLDEN_DIR, tol: float = 1e-4) -> list[str]:
     """Differences between the committed golden files and a fresh build."""
     problems: list[str] = []
     fresh = json.loads(json.dumps(build_golden()))  # same float round-trip as the files

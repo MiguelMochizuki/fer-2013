@@ -22,7 +22,7 @@ function inputFromPlane(b64) {
 }
 const allFaces = [];
 for (const name of Object.keys(pre.fixtures)) {
-  pre.fixtures[name].faces.forEach((f, i) => allFaces.push({ name, i, plane: f.plane224_b64, probs: gold.fixtures[name].faces[i].probs }));
+  pre.fixtures[name].faces.forEach((f, i) => allFaces.push({ name, i, plane: f.plane224_f32_b64, probs: gold.fixtures[name].faces[i].probs }));
 }
 const maxDiff = (a, b) => a.reduce((m, v, i) => Math.max(m, Math.abs(v - b[i])), 0);
 
@@ -51,7 +51,7 @@ test("features batem com o Python até 1e-3", { skip }, async () => {
   const clf = await realClassifier();
   const f = allFaces.find((x) => x.name === gold.features_fixture);
   const { features } = await clf.classify(inputFromPlane(f.plane), 1);
-  const want = floats(gold.features_b64);
+  const want = floats(gold.features_f32_b64);
   assert.equal(features.length, 512 * 49);
   assert.ok(maxDiff([...features], [...want]) <= 1e-3);
 });

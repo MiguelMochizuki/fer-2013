@@ -20,7 +20,7 @@ const loadFc = () => {
 
 test("mapa 7x7 igual ao Python nas 7 classes até 1e-4", { skip }, () => {
   const fc = loadFc();
-  const features = floats(cls.features_b64);
+  const features = floats(cls.features_f32_b64);
   gold.cams.forEach((want, c) => {
     const got = gradcamPP(features, fc, c);
     assert.equal(got.length, 49);

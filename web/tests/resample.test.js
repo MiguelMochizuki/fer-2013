@@ -35,8 +35,8 @@ test("resizeU8 idêntico byte a byte ao Pillow", () => {
 
 test("resizeF32 até 1e-4 do Pillow", () => {
   for (const c of byKind("f32")) {
-    const out = resizeF32(floats(c.input_b64), c.w, c.h, c.out_w, c.out_h, c.filter);
-    const want = floats(c.output_b64);
+    const out = resizeF32(floats(c.input_f32_b64), c.w, c.h, c.out_w, c.out_h, c.filter);
+    const want = floats(c.output_f32_b64);
     assert.equal(out.length, want.length);
     let max = 0;
     for (let i = 0; i < want.length; i++) max = Math.max(max, Math.abs(out[i] - want[i]));

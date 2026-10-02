@@ -61,7 +61,7 @@ test("crop, 48x48 e plano 224 iguais ao Python", () => {
       assert.deepEqual(crop.gray, bytes(f.crop_b64), `${name}[${i}] recorte cinza`);
       const input = toInput(crop.gray, crop.w, crop.h);
       assert.equal(input.length, 3 * 224 * 224);
-      const plane = floats(f.plane224_b64);
+      const plane = floats(f.plane224_f32_b64);
       let max = 0;
       for (let c = 0; c < 3; c++) {
         for (let p = 0; p < plane.length; p++) {
