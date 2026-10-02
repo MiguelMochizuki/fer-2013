@@ -293,7 +293,7 @@ Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus 
 - Faces from a detector are cropped square with a 10% margin before classification. On 1,476 FER test faces upscaled 4x (98% of 1,500 detected), classifying the detector crop scores 68.9% against 69.5% for the original 48x48 image on the same faces, and margins from 0% to 40% all land between 68.6% and 68.9%. So the crop costs about 0.6 points and the margin hardly matters. This is a proxy built from FER faces, not a benchmark on real photos.
 - Uploaded images are processed in memory and never written to disk or logged. Uploads are limited to 5 MB and JPEG, PNG or WebP.
 - The service is public and unauthenticated; it caps concurrent work and answers `503` when busy.
-- The API returns at most the 10 highest-scoring faces per image, because it is a public service. The browser demo has no such cap: it runs on your own CPU, so a crowd just takes longer (classification is batched 16 faces at a time).
+- Neither the API nor the browser demo caps the number of faces: every face the detector finds is classified, so a crowd takes proportionally longer (the browser classifies 16 faces per batch). Detection runs on the image downscaled to at most 640 px on the long side, so small faces in a large crowd photo can be missed.
 
 ## Browser demo
 
