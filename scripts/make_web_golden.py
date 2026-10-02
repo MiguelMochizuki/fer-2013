@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import math
@@ -80,9 +81,103 @@ def build_meta() -> dict[str, Any]:
     }
 
 
+def _b64(array: np.ndarray) -> str:
+    return base64.b64encode(np.ascontiguousarray(array).tobytes()).decode("ascii")
+
+
+_FILTERS = {
+    "bilinear": Image.Resampling.BILINEAR,
+    "bicubic": Image.Resampling.BICUBIC,
+    "lanczos": Image.Resampling.LANCZOS,
+}
+
+
+def _u8_case(name: str, img: Image.Image, size: tuple[int, int], filt: str) -> dict[str, Any]:
+    src = np.asarray(img)
+    out = np.asarray(img.resize(size, _FILTERS[filt]))
+    return {
+        "name": name,
+        "kind": "u8",
+        "filter": filt,
+        "w": img.width,
+        "h": img.height,
+        "channels": 1 if src.ndim == 2 else src.shape[2],
+        "out_w": size[0],
+        "out_h": size[1],
+        "input_b64": _b64(src),
+        "output_b64": _b64(out),
+    }
+
+
+def build_resample() -> dict[str, Any]:
+    """Resampling and grayscale cases the JS port must reproduce exactly (8 bit) or to 1e-4 (float)."""
+    face = Image.open(FIXTURES_DIR / "face.png").convert("RGB")
+    gray = face.convert("L")
+
+    # The detector's 640 px cap: too big to store, so the fixture is the input and
+    # the golden keeps only the hash of the 640x640 result.
+    large = Image.open(FIXTURES_DIR / "large_800.png").convert("RGB")
+    capped = np.asarray(large.resize((640, 640), _FILTERS["bilinear"]))
+    cap_case = {
+        "name": "rgb_800_to_640_bilinear",
+        "kind": "u8",
+        "filter": "bilinear",
+        "w": 800,
+        "h": 800,
+        "channels": 3,
+        "out_w": 640,
+        "out_h": 640,
+        "input_fixture": "large_800.png",
+        "output_sha256": hashlib.sha256(capped.tobytes()).hexdigest(),
+    }
+
+    face48 = np.asarray(gray.crop((50, 40, 185, 175)).resize((48, 48), _FILTERS["lanczos"]))
+    plane = face48.astype(np.float32) / np.float32(255.0)
+    big = np.asarray(Image.fromarray(plane, "F").resize((224, 224), _FILTERS["bicubic"]), dtype=np.float32)
+    float_case = {
+        "name": "f_48_to_224_bicubic",
+        "kind": "f32",
+        "filter": "bicubic",
+        "w": 48,
+        "h": 48,
+        "channels": 1,
+        "out_w": 224,
+        "out_h": 224,
+        "input_b64": _b64(plane),
+        "output_b64": _b64(big),
+    }
+
+    alpha = (np.arange(face.width * face.height) % 256).astype(np.uint8).reshape(face.height, face.width)
+    rgba = np.dstack([np.asarray(face), alpha])
+    gray_cases = [
+        {
+            "name": f"rgb_to_gray_stride{stride}",
+            "kind": "gray",
+            "w": face.width,
+            "h": face.height,
+            "stride": stride,
+            "input_b64": _b64(np.asarray(face) if stride == 3 else rgba),
+            "output_b64": _b64(np.asarray(gray)),
+        }
+        for stride in (3, 4)
+    ]
+
+    cases = [
+        cap_case,
+        _u8_case("l_135_to_48_lanczos", gray.crop((50, 40, 185, 175)), (48, 48), "lanczos"),
+        _u8_case("l_90x113_to_48_lanczos", gray.crop((60, 30, 150, 143)), (48, 48), "lanczos"),
+        _u8_case("l_24_to_48_lanczos", gray.crop((100, 100, 124, 124)), (48, 48), "lanczos"),
+        _u8_case("rgb_260_to_130_bilinear", face, (130, 130), "bilinear"),
+        _u8_case("l_90x113_to_30x50_bicubic", gray.crop((60, 30, 150, 143)), (30, 50), "bicubic"),
+        float_case,
+        *gray_cases,
+    ]
+    return {"cases": cases}
+
+
 def build_golden() -> dict[str, Any]:
     """Section name -> JSON-serializable content. Binary data goes in `*_b64` fields."""
-    return {"meta": build_meta()}
+    return {"meta": build_meta(), "resample": build_resample()}
 
 
 def write_golden(out_dir: Path = GOLDEN_DIR) -> None:
