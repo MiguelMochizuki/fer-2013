@@ -5,6 +5,7 @@
  */
 
 import { S } from "./strings.js";
+import { createTracker } from "./live.js";
 import { rankProbabilities, validateFile } from "./view.js";
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +15,7 @@ const els = {
   photo: $("photo"), canvas: $("canvas"), boxes: $("boxes"),
   progress: $("progress"), progressFill: $("progressFill"), status: $("status"),
   error: $("error"), errorText: $("errorText"), retry: $("retry"),
-  strip: $("strip"), faces: $("faces"), timings: $("timings"), plate: $("plate"),
+  camera: $("camera"), strip: $("strip"), faces: $("faces"), timings: $("timings"), plate: $("plate"),
 };
 
 // ---- static text ----
@@ -39,7 +40,8 @@ let worker = null;
 let ready = false;
 let initInFlight = false;
 let readyDeferred = null;
-let resultDeferred = null;
+const pending = new Map(); // analysis id -> deferred
+let nextRequest = 1;
 let lastProgress = null;
 
 const deferred = () => {
@@ -58,7 +60,8 @@ function onMessage({ data }) {
     initInFlight = false;
     readyDeferred.resolve();
   } else if (data.type === "result") {
-    resultDeferred?.resolve(data.result);
+    pending.get(data.id)?.resolve(data.result);
+    pending.delete(data.id);
   } else if (data.type === "error") {
     const error = { code: data.code };
     if (!ready) {
@@ -68,8 +71,23 @@ function onMessage({ data }) {
       initInFlight = false;
       readyDeferred?.reject(error);
     }
-    resultDeferred?.reject(error);
+    if (data.id !== undefined) {
+      pending.get(data.id)?.reject(error);
+      pending.delete(data.id);
+    } else {
+      for (const d of pending.values()) d.reject(error);
+      pending.clear();
+    }
   }
+}
+
+/** Send one image to the worker; resolves with its result. */
+function analyze(bitmap) {
+  const id = nextRequest++;
+  const d = deferred();
+  pending.set(id, d);
+  worker.postMessage({ type: "analyze", id, bitmap, explain: true }, [bitmap]);
+  return d.promise;
 }
 
 function startWorker() {
@@ -104,7 +122,7 @@ function setState(state) {
 }
 function setBusy(value) {
   busy = value;
-  els.choose.disabled = els.example.disabled = els.plate.disabled = value || !supported;
+  els.choose.disabled = els.example.disabled = els.plate.disabled = els.camera.disabled = value || !supported;
 }
 function setStatus(text) {
   els.status.textContent = text;
@@ -268,6 +286,7 @@ async function run(blob) {
     setStatus(S.busy);
     return;
   }
+  stopCamera();
   setBusy(true);
   lastBlob = blob;
   clearResults();
@@ -296,10 +315,9 @@ async function run(blob) {
     }
     setState("analyzing");
     setStatus(S.detecting);
-    resultDeferred = deferred();
-    worker.postMessage({ type: "analyze", bitmap, explain: true }, [bitmap]);
+    const waiting = analyze(bitmap);
     bitmap = null; // transferred: the worker closes it
-    const result = await resultDeferred.promise;
+    const result = await waiting;
     await renderResult(result);
     setState("result");
   } catch (error) {
@@ -310,6 +328,192 @@ async function run(blob) {
   } finally {
     setBusy(false);
   }
+}
+
+// ---- live camera ----
+const LIVE_MIN_INTERVAL = 100; // ms between analyses, so the page does not pin a core
+const LIVE_MAX_WIDTH = 960;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let live = null;
+
+function cameraErrorCode(error) {
+  switch (error?.name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "cameraDenied";
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "cameraMissing";
+    case "NotReadableError":
+    case "AbortError":
+      return "cameraBusy";
+    default:
+      return "cameraUnsupported";
+  }
+}
+
+function stopCamera() {
+  if (!live) return;
+  const session = live;
+  live = null;
+  cancelAnimationFrame(session.raf);
+  for (const track of session.stream.getTracks()) track.stop();
+  session.video.srcObject = null;
+  els.camera.textContent = S.useCamera;
+  els.camera.setAttribute("aria-pressed", "false");
+  if (app.dataset.state === "live") {
+    clearResults();
+    setStatus("");
+    setState("idle");
+  }
+}
+
+async function startCamera() {
+  if (live || busy) return;
+  clearResults();
+  setStatus(S.cameraStarting);
+  let stream = null;
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw { name: "Unsupported" };
+    const asking = navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 960 }, height: { ideal: 720 } }, audio: false });
+    prefetch(); // the permission prompt and the model download overlap
+    stream = await asking;
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+    await video.play();
+
+    const session = { stream, video, raf: 0, tracker: createTracker(), selected: null, boxes: new Map(), picks: new Map(), fps: 0 };
+    live = session;
+    els.camera.textContent = S.stopCamera;
+    els.camera.setAttribute("aria-pressed", "true");
+
+    const scale = Math.min(1, LIVE_MAX_WIDTH / video.videoWidth);
+    els.canvas.width = Math.round(video.videoWidth * scale);
+    els.canvas.height = Math.round(video.videoHeight * scale);
+    els.canvas.setAttribute("aria-label", S.liveLabel);
+    const ctx = els.canvas.getContext("2d", { willReadFrequently: false });
+    const draw = () => {
+      if (live !== session) return;
+      ctx.setTransform(-1, 0, 0, 1, els.canvas.width, 0); // mirrored, like a mirror
+      ctx.drawImage(video, 0, 0, els.canvas.width, els.canvas.height);
+      session.raf = requestAnimationFrame(draw);
+    };
+    draw();
+    els.photo.hidden = false;
+    els.photo.classList.add("in");
+    els.boxes.classList.add("in");
+    setState("live");
+
+    if (!ready) {
+      els.progress.hidden = false;
+      renderProgress();
+      await ensureReady();
+      els.progress.hidden = true;
+    }
+    if (live !== session) return;
+    setStatus(S.detecting);
+    await liveLoop(session);
+  } catch (error) {
+    stream?.getTracks().forEach((track) => track.stop());
+    els.progress.hidden = true;
+    const wasLive = live !== null;
+    if (wasLive) stopCamera();
+    setState("error");
+    showError(typeof error?.code === "string" ? error.code : cameraErrorCode(error));
+  }
+}
+
+async function liveLoop(session) {
+  let last = performance.now();
+  while (live === session) {
+    if (document.hidden) {
+      await sleep(250);
+      continue;
+    }
+    const started = performance.now();
+    const bitmap = await createImageBitmap(els.canvas);
+    const result = await analyze(bitmap);
+    if (live !== session) return;
+    const now = performance.now();
+    session.fps = 0.7 * session.fps + 0.3 * (1000 / (now - last));
+    last = now;
+    renderLive(session, result);
+    await sleep(Math.max(0, LIVE_MIN_INTERVAL - (performance.now() - started)));
+  }
+}
+
+function renderLive(session, result) {
+  const tracks = session.tracker.update(result.faces);
+  session.last = { tracks, width: result.image.width, height: result.image.height };
+  paintLive(session);
+}
+
+function paintLive(session) {
+  const { tracks, width, height } = session.last;
+  const ids = new Set(tracks.map((t) => t.id));
+  const select = (id) => {
+    session.selected = id;
+    paintLive(session);
+  };
+  if (!ids.has(session.selected)) session.selected = tracks[0]?.id ?? null;
+
+  for (const [id, node] of session.boxes) {
+    if (!ids.has(id)) {
+      node.remove();
+      session.boxes.delete(id);
+    }
+  }
+  for (const [id, node] of session.picks) {
+    if (!ids.has(id)) {
+      node.remove();
+      session.picks.delete(id);
+    }
+  }
+  for (const track of tracks) {
+    let box = session.boxes.get(track.id);
+    if (!box) {
+      box = h("div", "box");
+      box.append(h("span", "tag"));
+      box.addEventListener("click", () => select(track.id));
+      els.boxes.append(box);
+      session.boxes.set(track.id, box);
+    }
+    box.style.left = `${(track.box.x / width) * 100}%`;
+    box.style.top = `${(track.box.y / height) * 100}%`;
+    box.style.width = `${(track.box.w / width) * 100}%`;
+    box.style.height = `${(track.box.h / height) * 100}%`;
+    box.firstChild.textContent = `${track.id} ${S.emotions[track.emotion]} ${Math.round(track.confidence * 100)}%`;
+    box.classList.toggle("stale", track.stale);
+    box.classList.toggle("active", track.id === session.selected);
+
+    let pick = session.picks.get(track.id);
+    if (!pick) {
+      pick = h("button", "pick");
+      pick.type = "button";
+      pick.append(h("canvas"), h("span", "pick-n", String(track.id)));
+      pick.addEventListener("click", () => select(track.id));
+      els.strip.append(pick);
+      session.picks.set(track.id, pick);
+    }
+    pick.setAttribute("aria-label", `${S.faceLabel(track.id)}: ${S.emotions[track.emotion]}`);
+    pick.setAttribute("aria-pressed", String(track.id === session.selected));
+    pick.classList.toggle("stale", track.stale);
+    if (!track.stale) paint(pick.firstChild, grayToImageData(track.crop.gray, track.crop.w, track.crop.h));
+  }
+  els.boxes.classList.toggle("multi", tracks.length > 1);
+  els.strip.hidden = tracks.length < 2;
+
+  const current = tracks.find((t) => t.id === session.selected);
+  if (current) {
+    const card = buildCard(current, current.id - 1);
+    card.classList.add("in");
+    els.faces.replaceChildren(card);
+  } else {
+    els.faces.replaceChildren();
+  }
+  setStatus(tracks.length === 0 ? `${S.noFace} ${S.noFaceTips}` : S.liveStatus(tracks.length, session.fps));
 }
 
 // ---- events ----
@@ -329,10 +533,11 @@ async function runExample() {
     showError("download");
   }
 }
+els.camera.addEventListener("click", () => (live ? stopCamera() : startCamera()));
 els.example.addEventListener("click", runExample);
 els.plate.addEventListener("click", runExample);
 els.retry.addEventListener("click", () => run(lastBlob));
-for (const button of [els.choose, els.example, els.plate]) {
+for (const button of [els.choose, els.camera, els.example, els.plate]) {
   button.addEventListener("pointerenter", prefetch);
   button.addEventListener("focus", prefetch);
 }
@@ -355,6 +560,6 @@ document.addEventListener("drop", (e) => {
 if (!supported) {
   setBusy(false);
   showError("unsupported");
-  els.choose.disabled = els.example.disabled = els.plate.disabled = true;
+  els.choose.disabled = els.example.disabled = els.plate.disabled = els.camera.disabled = true;
 }
 setState("idle");

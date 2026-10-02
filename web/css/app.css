@@ -65,11 +65,11 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 24px 56px; display: grid; g
   .stage { grid-area: stage; }
   .results { display: none; }
   .note { grid-area: note; }
-  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"]) {
+  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) {
     grid-template-areas: "intro intro" "stage results" "note note"; align-items: start; gap: 16px 56px; padding-top: 0;
   }
-  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"]) .results { display: block; grid-area: results; }
-  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"]) .stage { position: sticky; top: 16px; }
+  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .results { display: block; grid-area: results; }
+  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .stage { position: sticky; top: 16px; }
 }
 
 h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98; letter-spacing: -0.035em; font-weight: 700; font-stretch: 80%; text-wrap: balance; }
@@ -80,7 +80,7 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 .hint + .hint { margin-top: 4px; }
 
 /* once a photo is in, the intro collapses to a single row of controls */
-#app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"]) :is(h1, .lede, .hint) { display: none; }
+#app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) :is(h1, .lede, .hint) { display: none; }
 
 .btn {
   min-height: 44px; padding: 0 22px; border: 1px solid var(--line); border-radius: 0;
@@ -116,9 +116,11 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 .boxes { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 200ms var(--ease-out); }
 .boxes.in { opacity: 1; }
 .box { position: absolute; border: 2px solid var(--accent); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.55); transition: opacity 150ms ease; }
-.box .tag { position: absolute; left: -2px; top: -2px; transform: translateY(-100%); min-width: 24px; padding: 0 7px; background: var(--accent); color: var(--accent-ink); font: 700 0.8125rem/1.5 var(--sans); text-align: center; }
+.box .tag { position: absolute; left: -2px; top: -2px; transform: translateY(-100%); white-space: nowrap; min-width: 24px; padding: 0 7px; background: var(--accent); color: var(--accent-ink); font: 700 0.8125rem/1.5 var(--sans); text-align: center; }
 .boxes.multi .box { pointer-events: auto; cursor: pointer; opacity: 0.6; }
 .boxes.multi .box.active, .boxes.multi .box:hover { opacity: 1; }
+.box.stale { opacity: 0.35 !important; }
+.pick.stale { opacity: 0.4; }
 
 /* ---------- progress / status / error ---------- */
 .progress { height: 2px; margin-top: 12px; overflow: hidden; }
