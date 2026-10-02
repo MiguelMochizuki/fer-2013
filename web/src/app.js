@@ -19,6 +19,7 @@ const els = {
 
 // ---- static text ----
 for (const node of document.querySelectorAll("[data-s]")) node.textContent = S[node.dataset.s];
+for (const node of document.querySelectorAll("[data-s-label]")) node.setAttribute("aria-label", S[node.dataset.sLabel]);
 document.title = S.title;
 
 function h(tag, className, text) {

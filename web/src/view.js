@@ -28,9 +28,9 @@ export function rankProbabilities(probabilities) {
     .sort((a, b) => b.p - a.p);
 }
 
-/** Decimal units with a comma, as in pt-BR: 46,9 MB. */
+/** Decimal units: 46.9 MB. */
 export function formatBytes(n) {
-  const decimal = (v) => v.toFixed(1).replace(".", ",");
+  const decimal = (v) => v.toFixed(1);
   if (n >= 1e6) return `${decimal(n / 1e6)} MB`;
   if (n >= 1e3) return `${decimal(n / 1e3)} kB`;
   return `${n} B`;

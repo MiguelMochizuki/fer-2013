@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; style-src 'self'; worker-src 'self'">
-  <title>Demo de emoções no rosto</title>
+  <title>Facial expression classifier</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/app.css">
   <script type="module" src="src/app.js"></script>
@@ -13,7 +13,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="./" data-s="brand"></a>
-    <nav class="links" aria-label="Links do projeto">
+    <nav class="links" data-s-label="navLabel">
       <a class="link" href="https://github.com/MiguelMochizuki/fer-2013" rel="noopener"><span class="icon icon-github" aria-hidden="true"></span><span data-s="navCode"></span></a>
       <a class="link" href="https://github.com/MiguelMochizuki/fer-2013#api" rel="noopener"><span data-s="navApi"></span></a>
     </nav>
@@ -31,8 +31,8 @@
       <p class="hint" data-s="privacy"></p>
     </section>
 
-    <section class="stage" aria-label="Foto">
-      <button class="plate" id="plate" type="button" aria-label="Analisar a foto de exemplo">
+    <section class="stage" data-s-label="stageAria">
+      <button class="plate" id="plate" type="button" data-s-label="plateAria">
         <img src="examples/astronaut.jpg" alt="" width="551" height="552">
         <span class="plate-box" aria-hidden="true"></span>
         <span class="plate-cap" data-s="plateCaption"></span>
@@ -55,7 +55,7 @@
       </div>
     </section>
 
-    <section class="results" aria-label="Resultados">
+    <section class="results" data-s-label="resultsAria">
       <ol class="faces" id="faces"></ol>
       <dl class="timings" id="timings" hidden></dl>
     </section>

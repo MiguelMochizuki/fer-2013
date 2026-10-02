@@ -36,9 +36,9 @@ test("rankProbabilities ordena e preserva os 7 rótulos", () => {
   assert.ok(ranked.every((r, i) => i === 0 || ranked[i - 1].p >= r.p));
 });
 
-test("formatBytes usa vírgula decimal como em pt-BR", () => {
-  assert.equal(formatBytes(46_900_000), "46,9 MB");
-  assert.equal(formatBytes(14_200_000), "14,2 MB");
-  assert.equal(formatBytes(2_300), "2,3 kB");
+test("formatBytes uses a decimal point", () => {
+  assert.equal(formatBytes(46_900_000), "46.9 MB");
+  assert.equal(formatBytes(14_200_000), "14.2 MB");
+  assert.equal(formatBytes(2_300), "2.3 kB");
   assert.equal(formatBytes(120), "120 B");
 });
