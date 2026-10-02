@@ -34,7 +34,7 @@ test("all-zero features give zeros, not NaN", { skip }, () => {
   assert.ok(cam.every((v) => v === 0));
 });
 
-test("mapa fica em [0,1]", { skip }, () => {
+test("the map stays in [0,1]", { skip }, () => {
   const rng = (i) => Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1;
   const features = Float32Array.from({ length: 512 * 49 }, (_, i) => rng(i));
   const cam = gradcamPP(features, loadFc(), 2);

@@ -34,7 +34,7 @@ async function realClassifier() {
 }
 const skip = !existsSync(MODEL);
 
-test("EMOTIONS na ordem do treino", () => {
+test("EMOTIONS are in training order", () => {
   assert.deepEqual([...EMOTIONS], ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]);
 });
 

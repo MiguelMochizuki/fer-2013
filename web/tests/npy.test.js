@@ -33,7 +33,7 @@ test("accepts a one-dimension shape with a trailing comma", () => {
   assert.deepEqual([...data], [1, 2, 3]);
 });
 
-test("rejeita fortran_order e dtype diferente de float32", () => {
+test("rejects fortran_order and any dtype other than float32", () => {
   assert.throws(() => parseNpy(makeNpy([2, 2], new Float32Array(4), { fortran: true })), Error);
   assert.throws(() => parseNpy(makeNpy([2, 2], new Float32Array(4), { descr: "<f8" })), Error);
   assert.throws(() => parseNpy(new Uint8Array([1, 2, 3, 4]).buffer), Error);

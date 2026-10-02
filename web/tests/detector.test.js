@@ -40,7 +40,7 @@ test("decodeYunet decodes a known cell", () => {
   near(b.score, 0.81, 1e-6, "score");
 });
 
-test("decodeYunet descarta scores abaixo do limiar", () => {
+test("decodeYunet drops scores below the threshold", () => {
   const out = emptyOutputs(32, 64);
   out.cls_8[19] = 0.5;
   out.obj_8[19] = 0.5; // score 0.5 < 0.6
@@ -78,7 +78,7 @@ test("pads to a multiple of 32 without scaling up", async () => {
   assert.deepEqual(calls[0].dims, [1, 3, 96, 128]);
 });
 
-test("reduz o maior lado a 640 antes de detectar", async () => {
+test("caps the long side at 640 before detecting", async () => {
   const { ort, session, calls } = stubOrt();
   await createYuNetDetector(ort, session).detect(new Uint8Array(1200 * 600 * 3), 1200, 600);
   assert.deepEqual(calls[0].dims, [1, 3, 320, 640]);
