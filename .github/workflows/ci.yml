@@ -27,6 +27,30 @@ jobs:
         run: ONLY_YUNET=1 scripts/fetch_models.sh models serving/models.sha256
       - run: uv run pytest -q -m "not slow"
 
+  web:
+    name: Web demo tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: uv sync --frozen
+      - name: Fetch the models (classifier and both YuNet versions)
+        run: |
+          RELEASE_URL=$(sed -n 's/^ARG RELEASE_URL=//p' Dockerfile)
+          ONLY_YUNET=1 scripts/fetch_models.sh models serving/models.sha256
+          WEB=1 RELEASE_URL="$RELEASE_URL" scripts/fetch_models.sh models serving/models.sha256
+      - run: npm ci --prefix web
+      - run: npm test --prefix web
+      - name: Golden files are fresh
+        run: uv run pytest tests/web -q
+
   # Needs the models Release (tag models-v1.1.0) and a complete serving/models.sha256.
   # Enable it by setting the repository variable DOCKER_BUILD=true. While it is
   # off, deploy is skipped too, so nothing ships without this smoke test.

@@ -33,6 +33,7 @@ from fer_2013.serving.api import _clamp
 from fer_2013.serving.classifier import Classifier
 from fer_2013.serving.detector import YuNetDetector
 from fer_2013.serving.gradcam import gradcam_pp, overlay_png_b64
+from fer_2013.serving.labels import EMOTIONS
 from fer_2013.serving.preprocess import MEAN, RESIZE_TO, STD, crop_gray, to_input
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -337,6 +338,31 @@ def build_gradcam() -> dict[str, Any]:
     }
 
 
+def build_analyze() -> dict[str, Any]:
+    """What `POST /predict` computes per face, from the same serving functions."""
+    clf = Classifier(MODELS_DIR / "fer_resnet18.onnx", MODELS_DIR / "fer_fc_weight.npy")
+    out: dict[str, Any] = {}
+    for name in FIXTURE_NAMES:
+        faces = []
+        for box, gray in detected_faces(name):
+            probs, features = clf.predict(to_input(gray))
+            cls = int(probs[0].argmax())
+            cam = gradcam_pp(features[0], clf.fc_weight, cls)
+            faces.append(
+                {
+                    "box": {"x": box.x, "y": box.y, "w": box.w, "h": box.h},
+                    "emotion": EMOTIONS[cls],
+                    "confidence": float(probs[0][cls]),
+                    "probabilities": {
+                        e: float(p) for e, p in zip(EMOTIONS, probs[0], strict=True)
+                    },
+                    "cam": [float(v) for v in cam.ravel()],
+                }
+            )
+        out[name] = {"faces": faces}
+    return {"fixtures": out}
+
+
 def build_golden() -> dict[str, Any]:
     """Section name -> JSON-serializable content. Binary data goes in `*_b64` fields."""
     return {
@@ -346,6 +372,7 @@ def build_golden() -> dict[str, Any]:
         "preprocess": build_preprocess(),
         "classifier": build_classifier(),
         "gradcam": build_gradcam(),
+        "analyze": build_analyze(),
     }
 
 
