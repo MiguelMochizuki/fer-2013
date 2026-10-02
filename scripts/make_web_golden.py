@@ -76,6 +76,7 @@ def build_meta() -> dict[str, Any]:
         "classifier_sha256": pins["fer_resnet18.onnx"],
         "fc_weight_sha256": pins["fer_fc_weight.npy"],
         "yunet_2023_sha256": pins["face_detection_yunet_2023mar.onnx"],
+        "yunet_2026_sha256": pins["face_detection_yunet_2026may.onnx"],
         "temperature": classifier.temperature,
         "fixtures": {name: _sha256(FIXTURES_DIR / name) for name in FIXTURE_NAMES},
     }
@@ -197,9 +198,55 @@ def build_resample() -> dict[str, Any]:
     return {"cases": cases}
 
 
+def cv_detect_floats(image: Image.Image) -> list[dict[str, float]]:
+    """What `YuNetDetector` computes, but with float boxes (it truncates them to int).
+
+    Same rules: longest side capped at 640 with a bilinear resize, OpenCV
+    `FaceDetectorYN` (2023mar model, score 0.6, NMS 0.3), boxes mapped back to
+    the original size, sorted by score, at most 10.
+    """
+    rgb = image.convert("RGB")
+    scale = min(1.0, 640 / max(rgb.size))
+    if scale < 1.0:
+        size = (max(1, round(rgb.width * scale)), max(1, round(rgb.height * scale)))
+        rgb = rgb.resize(size, Image.Resampling.BILINEAR)
+    bgr = np.ascontiguousarray(np.asarray(rgb)[:, :, ::-1])
+    det = cv2.FaceDetectorYN.create(
+        str(MODELS_DIR / "face_detection_yunet_2023mar.onnx"), "", (320, 320), 0.6
+    )
+    det.setInputSize((rgb.width, rgb.height))
+    _, faces = det.detect(bgr)
+    if faces is None:
+        return []
+    boxes = [
+        {
+            "x": float(f[0] / scale),
+            "y": float(f[1] / scale),
+            "w": float(f[2] / scale),
+            "h": float(f[3] / scale),
+            "score": float(f[-1]),
+        }
+        for f in faces
+    ]
+    boxes.sort(key=lambda b: b["score"], reverse=True)
+    return boxes[:10]
+
+
+def build_detector() -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for name in FIXTURE_NAMES:
+        img = Image.open(FIXTURES_DIR / name).convert("RGB")
+        out[name] = {"w": img.width, "h": img.height, "faces": cv_detect_floats(img)}
+    return {"fixtures": out}
+
+
 def build_golden() -> dict[str, Any]:
     """Section name -> JSON-serializable content. Binary data goes in `*_b64` fields."""
-    return {"meta": build_meta(), "resample": build_resample()}
+    return {
+        "meta": build_meta(),
+        "resample": build_resample(),
+        "detector": build_detector(),
+    }
 
 
 def write_golden(out_dir: Path = GOLDEN_DIR) -> None:
