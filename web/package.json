@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Browser demo for the FER-2013 emotion classifier",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "ort": "node scripts/copy-ort.mjs"
   },
   "license": "AGPL-3.0-only",
   "devDependencies": {

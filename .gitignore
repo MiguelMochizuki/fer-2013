@@ -35,3 +35,4 @@ models/
 # Web demo
 web/node_modules/
 web/dist/
+web/ort/

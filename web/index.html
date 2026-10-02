@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; style-src 'self'; worker-src 'self'">
+  <title>Demo de emoções no rosto</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="src/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" data-s="brand"></a>
+    <nav class="links" aria-label="Links do projeto">
+      <a class="link" href="https://github.com/MiguelMochizuki/fer-2013" rel="noopener"><span class="icon icon-github" aria-hidden="true"></span><span data-s="navCode"></span></a>
+      <a class="link" href="https://github.com/MiguelMochizuki/fer-2013#api" rel="noopener"><span data-s="navApi"></span></a>
+    </nav>
+  </header>
+
+  <main id="app" data-state="idle">
+    <section class="intro">
+      <h1 data-s="title"></h1>
+      <p class="lede" data-s="lede"></p>
+    </section>
+
+    <div class="workspace">
+      <section class="stage" aria-label="Foto">
+        <div class="drop" id="drop">
+          <span class="icon icon-upload" aria-hidden="true"></span>
+          <div class="actions">
+            <button class="btn btn-primary" id="choose" type="button" data-s="choosePhoto"></button>
+            <button class="btn" id="example" type="button" data-s="tryExample"></button>
+          </div>
+          <p class="drop-hint" data-s="dropHint"></p>
+          <p class="hint" data-s="formats"></p>
+          <p class="privacy" data-s="privacy"></p>
+        </div>
+
+        <div class="photo" id="photo" hidden>
+          <canvas id="canvas" role="img"></canvas>
+          <div class="boxes" id="boxes"></div>
+        </div>
+
+        <div class="progress" id="progress" hidden>
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <div class="error" id="error" hidden>
+          <span class="icon icon-warning" aria-hidden="true"></span>
+          <p id="errorText"></p>
+          <button class="btn" id="retry" type="button" data-s="retry" hidden></button>
+        </div>
+      </section>
+
+      <section class="results" aria-label="Resultados">
+        <ol class="faces" id="faces"></ol>
+        <dl class="timings" id="timings" hidden></dl>
+        <p class="backend" id="backend" hidden></p>
+      </section>
+    </div>
+
+    <p class="note"><span data-s="limitation"></span> <a href="https://github.com/MiguelMochizuki/fer-2013#limitations-and-privacy" rel="noopener" data-s="limitationLink"></a></p>
+  </main>
+
+  <input type="file" id="file" accept="image/jpeg,image/png,image/webp" hidden>
+</body>
+</html>
