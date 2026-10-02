@@ -34,7 +34,7 @@ test("monta dist com a página, módulos, fontes, ícones, runtime e manifesto",
   await build({ modelsDir: models, outDir: out, metaPath });
   for (const f of [
     "index.html", "css/app.css", "src/app.js", "src/worker.js", "src/pipeline.js",
-    "fonts/Geist-Variable.woff2", "fonts/LICENSE-Geist.txt", "icons/github-logo.svg", "icons/LICENSE-Phosphor.txt",
+    "fonts/InstrumentSans-Variable.woff2", "fonts/LICENSE-InstrumentSans.txt", "icons/github-logo.svg", "icons/LICENSE-Phosphor.txt",
     "examples/astronaut.jpg", "ort/ort.wasm.min.mjs", "ort/ort-wasm-simd-threaded.mjs", "ort/ort-wasm-simd-threaded.wasm",
     "manifest.json",
   ]) assert.ok(existsSync(join(out, f)), `falta ${f}`);

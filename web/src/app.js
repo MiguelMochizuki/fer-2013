@@ -163,9 +163,6 @@ function buildCard(face, i, box) {
   card.style.setProperty("--i", String(Math.min(i, 5)));
   card.setAttribute("aria-label", `${S.faceLabel(index)}: ${S.emotions[face.emotion]}, ${Math.round(face.confidence * 100)}%`);
 
-  const verdict = h("header", "verdict");
-  verdict.append(h("p", "face-title", S.faceLabel(index)), h("p", "emotion", S.emotions[face.emotion]), h("span", "confidence", `${Math.round(face.confidence * 100)}%`));
-
   const views = h("div", "views");
   const figure = (canvas, caption) => {
     const fig = h("figure", "view");
@@ -185,15 +182,17 @@ function buildCard(face, i, box) {
     views.append(figure(heat, S.heatmap));
   }
 
-  const probs = h("ul", "probs");
+  const words = h("ol", "words");
+  const faceTag = h("li", "face-tag", String(index));
+  faceTag.setAttribute("aria-hidden", "true");
+  words.append(faceTag);
   rankProbabilities(face.probabilities).forEach(({ label, p }, rank) => {
-    const row = h("li", rank === 0 ? "prob top" : "prob");
-    const fill = h("div", "fill");
-    fill.style.setProperty("--p", String(p));
-    row.append(h("span", "name", S.emotions[label]), fill, h("span", "pct", `${Math.round(p * 100)}%`));
-    probs.append(row);
+    const word = h("li", rank === 0 ? "word top" : "word");
+    word.style.setProperty("--p", String(p));
+    word.append(h("span", "", S.emotions[label]), h("span", "pct", `${Math.round(p * 100)}%`));
+    words.append(word);
   });
-  card.append(verdict, views, probs);
+  card.append(words, views);
 
   const highlight = (on) => {
     box.classList.toggle("active", on);

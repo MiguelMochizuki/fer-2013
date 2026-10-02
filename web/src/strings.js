@@ -5,9 +5,9 @@
 import { formatBytes } from "./view.js";
 
 export const S = {
-  brand: "FER-2013",
+  brand: "fer-2013",
   title: "Que emoção o modelo vê num rosto?",
-  lede: "Envie uma foto. O modelo acha os rostos, classifica a expressão de cada um e mostra, num mapa de calor, para onde olhou.",
+  lede: "Envie uma foto. O modelo acha os rostos, estima a expressão de cada um e mostra para onde olhou.",
   navCode: "Código",
   navApi: "API",
   choosePhoto: "Escolher foto",
@@ -22,8 +22,8 @@ export const S = {
   noFace: "Nenhum rosto encontrado.",
   noFaceTips: "Tente uma foto mais nítida, com o rosto de frente e bem iluminado.",
   faceLabel: (i) => `Rosto ${i}`,
-  original: "Original",
-  heatmap: "Heatmap",
+  original: "Recorte analisado",
+  heatmap: "Onde o modelo olhou",
   heatmapAlt: (i, emotion) => `Mapa de calor do rosto ${i}, previsão ${emotion}`,
   stageLabel: (n) => (n === 0 ? "Foto enviada, nenhum rosto encontrado" : n === 1 ? "Foto enviada com 1 rosto marcado" : `Foto enviada com ${n} rostos marcados`),
   timings: { detect: "Detecção", classify: "Classificação", gradcam: "Grad-CAM++", runtime: "Execução" },
