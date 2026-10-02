@@ -51,6 +51,18 @@ def _post(url: str, image: bytes) -> None:
 
 
 def run(url: str, image: bytes, n: int, warmup: int, explain: bool) -> list[float]:
+    """Time ``n`` POST /predict calls after ``warmup`` untimed ones.
+
+    Args:
+        url: Base URL of the running API.
+        image: Encoded image bytes to upload.
+        n: Number of timed requests.
+        warmup: Number of untimed requests sent first.
+        explain: Whether to ask for the Grad-CAM++ heatmap.
+
+    Returns:
+        Wall time of each timed request, in milliseconds.
+    """
     target = f"{url.rstrip('/')}/predict?explain={str(explain).lower()}"
     for _ in range(warmup):
         _post(target, image)
@@ -63,6 +75,14 @@ def run(url: str, image: bytes, n: int, warmup: int, explain: bool) -> list[floa
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the latency benchmark command line tool.
+
+    Args:
+        argv: Arguments to parse; defaults to ``sys.argv[1:]``.
+
+    Returns:
+        Exit code: 0 on success, non-zero on failure.
+    """
     parser = argparse.ArgumentParser(description="Benchmark POST /predict latency.")
     parser.add_argument("--url", default="http://localhost:7860")
     parser.add_argument("--image", type=Path, required=True)

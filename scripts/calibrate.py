@@ -64,6 +64,14 @@ def _metrics(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the temperature-scaling calibration command line tool.
+
+    Args:
+        argv: Arguments to parse; defaults to ``sys.argv[1:]``.
+
+    Returns:
+        Exit code: 0 on success, non-zero on failure.
+    """
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     if not args.checkpoint.exists():

@@ -45,6 +45,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the int8 quantization command line tool.
+
+    Args:
+        argv: Arguments to parse; defaults to ``sys.argv[1:]``.
+
+    Returns:
+        Exit code: 0 on success, non-zero on failure.
+    """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = _parse_args(argv)
     train = np.load(args.data_dir / "X_train.npy")

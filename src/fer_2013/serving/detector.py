@@ -25,7 +25,9 @@ class Box:
 class FaceDetector(Protocol):
     """Anything that finds faces in an RGB image. Boxes are in image pixels."""
 
-    def detect(self, image: Image.Image) -> list[Box]: ...
+    def detect(self, image: Image.Image) -> list[Box]:
+        """Return the face boxes in pixels of `image`, best score first."""
+        ...
 
 
 STRIDES = (8, 16, 32)
@@ -108,6 +110,14 @@ class YuNetDetector:
         self._nms_threshold = nms_threshold
 
     def detect(self, image: Image.Image) -> list[Box]:
+        """Find the faces in an image.
+
+        Args:
+            image: Any PIL image; it is converted to RGB.
+
+        Returns:
+            Integer boxes in pixels of the original image, best score first.
+        """
         rgb = image.convert("RGB")
         scale = min(1.0, self._max_side / max(rgb.size))
         if scale < 1.0:

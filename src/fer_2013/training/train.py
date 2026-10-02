@@ -154,6 +154,7 @@ def save_checkpoint(
     epoch: int,
     best_val_score: float,
 ) -> None:
+    """Write the model and optimizer state with the epoch and best validation score to `path`."""
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {

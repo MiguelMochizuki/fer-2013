@@ -118,6 +118,8 @@ serving/models.sha256           pinned hashes of every model the image and the s
 
 ## Development
 
+Code is documented in Google-style docstrings (Python) and JSDoc (JavaScript); the rules and examples are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ```bash
 uv run ruff check --fix . && uv run ruff format .   # lint and format
 uv run mypy                                         # strict type check

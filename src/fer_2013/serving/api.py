@@ -47,6 +47,8 @@ MultiPartParser.spool_max_size = MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD
 
 
 class BoxOut(BaseModel):
+    """A face box in pixels of the uploaded image."""
+
     x: int
     y: int
     w: int
@@ -54,6 +56,8 @@ class BoxOut(BaseModel):
 
 
 class FaceOut(BaseModel):
+    """One detected face: box, calibrated emotion probabilities and an optional heatmap."""
+
     box: BoxOut
     emotion: str
     confidence: float
@@ -62,17 +66,23 @@ class FaceOut(BaseModel):
 
 
 class ImageInfo(BaseModel):
+    """Size of the decoded upload in pixels."""
+
     width: int
     height: int
 
 
 class Timings(BaseModel):
+    """Where the request time went, in milliseconds."""
+
     detect: float
     classify: float
     total: float
 
 
 class PredictResponse(BaseModel):
+    """Result of POST /predict: one entry per detected face."""
+
     image: ImageInfo
     faces: list[FaceOut]
     timings_ms: Timings
@@ -158,6 +168,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """Load the models at startup unless they were injected (tests do)."""
         models = Path(os.environ.get("MODELS_DIR", "/app/models"))
         if app.state.classifier is None:
             app.state.classifier = Classifier(
@@ -187,10 +198,12 @@ def create_app(
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
+        """Serve the demo page."""
         return FileResponse(STATIC_DIR / "index.html")
 
     @app.get("/health")
     def health() -> dict[str, object]:
+        """Report the loaded classifier hash, its calibration temperature and the detector class."""
         return {
             "status": "ok",
             "models": {
@@ -202,6 +215,10 @@ def create_app(
 
     @app.post("/predict", response_model=PredictResponse)
     def predict(file: UploadFile, explain: bool = False) -> PredictResponse:
+        """Detect the faces in an uploaded JPEG, PNG or WebP and classify each one.
+
+        Set ``explain=true`` to include a base64 Grad-CAM++ PNG per face.
+        """
         return _predict(file, explain)
 
     def _predict(file: UploadFile, explain: bool) -> PredictResponse:
