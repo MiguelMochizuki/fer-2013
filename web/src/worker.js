@@ -1,9 +1,9 @@
 /**
  * Module worker: loads the models and runs the pipeline off the main thread.
  *
- * Messages in:  { type: "init" } | { type: "analyze", bitmap: ImageBitmap, explain?: boolean }
+ * Messages in:  { type: "init" } | { type: "analyze", id, bitmap: ImageBitmap, explain?: boolean }
  * Messages out: { type: "progress", loaded, total } | { type: "ready" }
- *               { type: "result", result } | { type: "error", code }
+ *               { type: "result", id, result } | { type: "error", id?, code }
  *   code: "unsupported" | "integrity" | "download" | "decode" | "inference"
  */
 
@@ -59,7 +59,15 @@ function codeFor(error, fallback) {
   return fallback;
 }
 
-self.onmessage = async ({ data }) => {
+// analyses run one at a time, in arrival order: the WASM sessions are not re-entrant
+let queue = Promise.resolve();
+
+self.onmessage = ({ data }) => {
+  if (data.type === "analyze") queue = queue.then(() => handle(data));
+  else handle(data);
+};
+
+async function handle(data) {
   if (data.type === "init") {
     try {
       await getPipeline();
@@ -80,15 +88,15 @@ self.onmessage = async ({ data }) => {
       data.bitmap.close();
       pixels = ctx.getImageData(0, 0, width, height).data;
     } catch {
-      postMessage({ type: "error", code: "decode" });
+      postMessage({ type: "error", id: data.id, code: "decode" });
       return;
     }
     try {
       const pipeline = await getPipeline();
       const result = await pipeline.analyze(pixels, width, height, { explain: data.explain !== false, stride: 4 });
-      postMessage({ type: "result", result });
+      postMessage({ type: "result", id: data.id, result });
     } catch (error) {
-      postMessage({ type: "error", code: codeFor(error, "inference") });
+      postMessage({ type: "error", id: data.id, code: codeFor(error, "inference") });
     }
   }
-};
+}
