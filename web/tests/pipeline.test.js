@@ -71,23 +71,30 @@ test("explain false não calcula heatmap", { skip }, async () => {
   assert.equal(got.timings.gradcam, 0);
 });
 
-test("mais de 10 rostos: no máximo 10", { skip }, async () => {
+test("many faces: all of them come back, in more than one classifier batch", { skip }, async () => {
   const p = await pipeline();
   const { rgb: face, w: fw, h: fh } = fixture("face.png");
   const tile = 150;
+  const cols = 5;
+  const rows = 4;
   const small = resizeU8(face, fw, fh, 3, tile, tile, "bicubic");
-  const W = 4 * tile;
-  const H = 3 * tile;
+  const W = cols * tile;
+  const H = rows * tile;
   const canvas = new Uint8Array(W * H * 3).fill(128);
-  for (let r = 0; r < 3; r++) {
-    for (let c = 0; c < 4; c++) {
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
       for (let y = 0; y < tile; y++) {
         canvas.set(small.subarray(y * tile * 3, (y + 1) * tile * 3), ((r * tile + y) * W + c * tile) * 3);
       }
     }
   }
-  const got = await p.analyze(canvas, W, H, { explain: false });
-  assert.equal(got.faces.length, 10);
+  const got = await p.analyze(canvas, W, H, { explain: true });
+  assert.equal(got.faces.length, cols * rows);
+  for (const f of got.faces) {
+    const sum = Object.values(f.probabilities).reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(sum - 1) < 1e-4);
+    assert.equal(f.cam.length, 49);
+  }
 });
 
 test("RGBA com alfa variado dá o mesmo resultado que RGB", { skip }, async () => {

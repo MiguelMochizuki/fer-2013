@@ -199,8 +199,6 @@ function buildCard(face, i) {
   return card;
 }
 
-const MAX_FACES = 10; // the detector's cap, same as the API
-
 function renderResult(result) {
   const { width, height } = result.image;
   const many = result.faces.length > 1;
@@ -256,7 +254,7 @@ function renderResult(result) {
   els.timings.append(backend);
   els.timings.hidden = false;
 
-  setStatus(result.faces.length === 0 ? `${S.noFace} ${S.noFaceTips}` : S.result(result.faces.length, t.total, result.faces.length >= MAX_FACES));
+  setStatus(result.faces.length === 0 ? `${S.noFace} ${S.noFaceTips}` : S.result(result.faces.length, t.total));
   return nextFrame().then(() => {
     els.boxes.classList.add("in");
     cards.forEach((c) => c.classList.add("in"));
