@@ -15,9 +15,10 @@ Test fixture tests/serving/fixtures/face.jpg
   scikit-image.
 
 Browser demo (web/)
-  Geist and Geist Mono fonts, Vercel, SIL Open Font License 1.1
-  (web/fonts/LICENSE-Geist.txt). Variable WOFF2 files copied from the npm
-  package "geist".
+  Instrument Sans font, The Instrument Sans Project Authors, SIL Open Font
+  License 1.1 (web/fonts/LICENSE-InstrumentSans.txt). Variable WOFF2 file
+  (wdth axis, latin subset) copied from the npm package
+  "@fontsource-variable/instrument-sans".
   Phosphor Icons, MIT License (web/icons/LICENSE-Phosphor.txt). Four SVG icons
   copied from @phosphor-icons/core.
   onnxruntime-web, Microsoft, MIT License. The WebAssembly runtime is copied
