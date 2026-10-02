@@ -17,6 +17,7 @@ import argparse
 import base64
 import functools
 import hashlib
+import io
 import json
 import math
 import sys
@@ -31,6 +32,7 @@ from PIL import Image
 from fer_2013.serving.api import _clamp
 from fer_2013.serving.classifier import Classifier
 from fer_2013.serving.detector import YuNetDetector
+from fer_2013.serving.gradcam import gradcam_pp, overlay_png_b64
 from fer_2013.serving.preprocess import MEAN, RESIZE_TO, STD, crop_gray, to_input
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -316,6 +318,25 @@ def build_classifier() -> dict[str, Any]:
     }
 
 
+def build_gradcam() -> dict[str, Any]:
+    """Grad-CAM++ maps for all 7 classes and the overlay of the predicted one (first face)."""
+    clf = Classifier(MODELS_DIR / "fer_resnet18.onnx", MODELS_DIR / "fer_fc_weight.npy")
+    name = FIXTURE_NAMES[0]
+    _box, gray = detected_faces(name)[0]
+    probs, features = clf.predict(to_input(gray))
+    cams = [gradcam_pp(features[0], clf.fc_weight, c) for c in range(7)]
+    predicted = int(probs[0].argmax())
+    png = base64.b64decode(overlay_png_b64(gray, cams[predicted]))
+    overlay = np.asarray(Image.open(io.BytesIO(png)).convert("RGB"))
+    return {
+        "fixture": name,
+        "cams": [[float(v) for v in cam.ravel()] for cam in cams],
+        "overlay_class": predicted,
+        "overlay_size": 128,
+        "overlay_rgb_b64": _b64(overlay),
+    }
+
+
 def build_golden() -> dict[str, Any]:
     """Section name -> JSON-serializable content. Binary data goes in `*_b64` fields."""
     return {
@@ -324,6 +345,7 @@ def build_golden() -> dict[str, Any]:
         "detector": build_detector(),
         "preprocess": build_preprocess(),
         "classifier": build_classifier(),
+        "gradcam": build_gradcam(),
     }
 
 
