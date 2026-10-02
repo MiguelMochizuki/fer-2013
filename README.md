@@ -18,7 +18,7 @@ Facial expression recognition with a ResNet18 trained on [FER-2013](https://www.
 |---|---|
 | Test accuracy / macro-F1 | 0.707 / 0.709 |
 | Calibration (test ECE, 15 bins) | 0.168 before, 0.022 after temperature scaling (T = 2.40) |
-| Shipped model: int8 (11 MB) versus fp32 (45 MB), full test set | 70.86% versus 70.80% accuracy, 97.5% identical predictions |
+| Shipped model: int8 (11 MB) versus fp32 (45 MB), full test set | 70.55% versus 70.80% accuracy, 96.3% identical predictions |
 | Face to result, in the browser (Chromium, one face) | about 150 ms: detection 20 to 30, classification 125, Grad-CAM++ 4 |
 | API latency (p50, one face, no CPU limit) | 10 ms, 14 ms with the heatmap |
 | Docker image | 438 MB on disk, 111 MB compressed (it was 742 MB and 209 MB) |
@@ -230,14 +230,16 @@ uv run python scripts/calibrate.py --checkpoint checkpoints/best.pt
 
 ### Quantization
 
-The shipped classifier is quantized to int8 after export: static QDQ quantization with per-channel weights, MinMax calibration on 300 random training faces, and the softmax kept in float so `probs` stay exact. The graph, its three outputs and the temperature metadata are unchanged, so nothing downstream knows the difference except the size and the speed. `scripts/quantize_onnx.py` refuses to write a model that agrees with the fp32 one on fewer than 95% of 1,000 validation faces or loses more than a point of accuracy.
+The shipped classifier is quantized to int8 after export: static QDQ quantization with per-channel weights, MinMax calibration on 1,000 random training faces, 7-bit range, and the softmax kept in float so `probs` stay exact. The graph, its three outputs and the temperature metadata are unchanged, so nothing downstream knows the difference except the size and the speed. `scripts/quantize_onnx.py` refuses to write a model that agrees with the fp32 one on fewer than 95% of 1,000 validation faces or loses more than a point of accuracy.
 
 | Model | Test accuracy | Macro-F1 | ECE (T refit on val) | Size | One image (2 threads) |
 |-------|---------------|----------|----------------------|------|-----------------------|
 | fp32 | 0.7080 | 0.7095 | 0.0234 (T = 2.395) | 44.7 MB | 17.2 ms |
-| int8 | 0.7086 | 0.7098 | 0.0243 (T = 2.391) | 11.3 MB | 5.8 ms |
+| int8 | 0.7055 | 0.7062 | 0.0210 (T = 2.403) | 11.3 MB | 5.8 ms |
 
-Accuracy, macro-F1 and calibration stay within noise (the standard error of the accuracy is about 0.8 points); 97.5% of predictions equal the fp32 ones, and the Grad-CAM++ maps correlate 0.999 with the fp32 maps (worst face 0.993). The temperature refit on the int8 logits is the same to three digits, so the T stored in the model was kept. int8 kernels round a few activations differently in ONNX Runtime Web than in native ONNX Runtime, so the browser's probabilities differ from Python's by up to 3e-3. The fp32 model is still published in the model release for tests and comparison.
+Accuracy, macro-F1 and calibration stay within noise (the standard error of the accuracy is about 0.8 points); 96.3% of predictions equal the fp32 ones, and the Grad-CAM++ maps correlate 0.9986 with the fp32 maps (worst face 0.992). The temperature refit on the int8 logits is within 0.01 of the stored one, so the T stored in the model (2.395) was kept. The fp32 model is still published in the model release for tests and comparison.
+
+**Why the 7-bit range matters.** With the default 8-bit range the same model looked just as good on the development machine (one with AVX-VNNI) and was badly wrong on a GitHub runner: AVX2 CPUs without VNNI saturate an int16 intermediate in ONNX Runtime's uint8 by int8 kernels, and the runner's probabilities were off by 0.26 and its feature maps by 55% (relative L2). Quantizing with `reduce_range` costs about a quarter of a point of accuracy here and gives results that are bit-identical on both CPUs. int8 kernels still round a few activations differently in ONNX Runtime Web than in native ONNX Runtime, so the browser's probabilities differ from Python's by up to 7e-3.
 
 ## API
 
@@ -289,7 +291,7 @@ The head is `avgpool -> Dropout -> Linear`, so in eval mode the gradient of a cl
 
 ### Performance
 
-The shipped int8 model scores 70.86% on the full test set through the ONNX Runtime pipeline with the serving preprocessing, against 70.80% for the fp32 ONNX model and 70.74% for PyTorch (see Quantization).
+The shipped int8 model scores 70.55% on the full test set through the ONNX Runtime pipeline with the serving preprocessing, against 70.80% for the fp32 ONNX model and 70.74% for PyTorch (see Quantization).
 
 Latency measured with `scripts/benchmark.py` against the Docker image (a 260x260 image with one face; `p50` / `p95` of the full request). On a 12th Gen Intel i5-12450HX with no CPU limit, 60 requests:
 

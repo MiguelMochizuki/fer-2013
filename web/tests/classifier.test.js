@@ -38,7 +38,7 @@ test("EMOTIONS are in training order", () => {
   assert.deepEqual([...EMOTIONS], ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]);
 });
 
-// The classifier is int8: WASM and native kernels round a few activations differently (seen up to 3e-3 in probs).
+// The classifier is int8: WASM and native kernels round a few activations differently (seen up to 7e-3 in probs).
 test("WASM probs match Python within 1e-2", { skip }, async () => {
   const clf = await realClassifier();
   assert.ok(allFaces.length >= 3);

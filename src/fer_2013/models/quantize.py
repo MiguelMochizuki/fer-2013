@@ -47,7 +47,8 @@ class _Calibration(CalibrationDataReader):  # type: ignore[misc]
         rng = np.random.default_rng(seed)
         picked = rng.choice(len(images), size=min(n, len(images)), replace=False)
         self._batches: Iterator[dict[str, np.ndarray]] = iter(
-            {"input": _inputs(images, picked[s : s + batch])} for s in range(0, len(picked), batch)
+            {"input": _inputs(images, picked[s : s + batch])}
+            for s in range(0, len(picked), batch)
         )
 
     def get_next(self) -> dict[str, np.ndarray] | None:
@@ -58,8 +59,10 @@ def quantize_classifier(
     fp32_path: Path,
     out_path: Path,
     calibration_images: np.ndarray,
-    n_calibration: int = 300,
+    n_calibration: int = 1000,
     seed: int = 0,
+    activation_type: QuantType = QuantType.QUInt8,
+    reduce_range: bool = True,
 ) -> Path:
     """Write the int8 model to `out_path` and return it.
 
@@ -69,20 +72,30 @@ def quantize_classifier(
         calibration_images: (N, 48, 48) uint8 training faces to calibrate on.
         n_calibration: how many random faces to calibrate with.
         seed: seed of that random sample.
+        activation_type: uint8 (default) or int8 activations.
+        reduce_range: 7-bit quantization range. Keep it on: without it, CPUs that have AVX2
+            but no VNNI (many cloud machines, GitHub runners) saturate an int16 intermediate in
+            ONNX Runtime and the model drifts badly (probabilities off by 0.26 on the CI runner);
+            with it the result is bit-identical across CPUs.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory() as tmp:
         prepared = Path(tmp) / "prepared.onnx"
         quant_pre_process(str(fp32_path), str(prepared))
         # Softmax would otherwise be quantized too, leaving `probs` on a 1/256 grid.
-        keep_float = [n.name for n in onnx.load(str(prepared)).graph.node if n.op_type == "Softmax"]
+        keep_float = [
+            n.name
+            for n in onnx.load(str(prepared)).graph.node
+            if n.op_type == "Softmax"
+        ]
         quantize_static(
             str(prepared),
             str(out_path),
             _Calibration(calibration_images, n_calibration, seed),
             quant_format=QuantFormat.QDQ,
             per_channel=True,
-            activation_type=QuantType.QUInt8,
+            activation_type=activation_type,
+            reduce_range=reduce_range,
             weight_type=QuantType.QInt8,
             calibrate_method=CalibrationMethod.MinMax,
             nodes_to_exclude=keep_float,
@@ -94,7 +107,10 @@ def quantize_classifier(
 def _logits(path: Path, images: np.ndarray, batch: int = 50) -> np.ndarray:
     sess = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
     out = [
-        sess.run(["logits"], {"input": _inputs(images, np.arange(s, min(s + batch, len(images))))})[0]
+        sess.run(
+            ["logits"],
+            {"input": _inputs(images, np.arange(s, min(s + batch, len(images))))},
+        )[0]
         for s in range(0, len(images), batch)
     ]
     return np.concatenate(out)
@@ -117,7 +133,11 @@ def verify_quantized(
         "accuracy_int8": float((got == labels).mean()),
     }
     if report["agreement"] < min_agreement:
-        raise QuantizationError(f"int8 agrees with fp32 on {report['agreement']:.3f} of images, need {min_agreement}")
+        raise QuantizationError(
+            f"int8 agrees with fp32 on {report['agreement']:.3f} of images, need {min_agreement}"
+        )
     if report["accuracy_fp32"] - report["accuracy_int8"] > max_accuracy_drop:
-        raise QuantizationError(f"int8 loses {report['accuracy_fp32'] - report['accuracy_int8']:.3f} accuracy, limit {max_accuracy_drop}")
+        raise QuantizationError(
+            f"int8 loses {report['accuracy_fp32'] - report['accuracy_int8']:.3f} accuracy, limit {max_accuracy_drop}"
+        )
     return report

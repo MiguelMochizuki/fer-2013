@@ -34,7 +34,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--out", type=Path, required=True, help="where to write the int8 model"
     )
     parser.add_argument("--data-dir", type=Path, default=Path("data/processed"))
-    parser.add_argument("--calibration-images", type=int, default=300)
+    parser.add_argument("--calibration-images", type=int, default=1000)
     parser.add_argument(
         "--verify-images",
         type=int,
