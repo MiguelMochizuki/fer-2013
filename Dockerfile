@@ -9,7 +9,8 @@ RUN apt-get update \
 
 # Dependencies first so this layer is cached across code changes.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --only-group serve --no-install-project
+RUN uv sync --frozen --no-dev --only-group serve --no-install-project \
+    && find .venv -type d \( -name tests -o -name test \) -prune -exec rm -rf {} +
 
 ARG RELEASE_URL=https://github.com/MiguelMochizuki/fer-2013/releases/download/models-v1.1.0
 ARG SHA_FILE=serving/models.sha256
@@ -19,7 +20,7 @@ RUN RELEASE_URL=${RELEASE_URL} fetch_models.sh /app/models /tmp/models.sha256
 
 
 FROM python:3.12-slim-bookworm
-# Hugging Face Spaces runs Docker Spaces as UID 1000.
+# Run as an unprivileged user.
 RUN useradd -m -u 1000 user
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv

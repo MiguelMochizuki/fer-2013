@@ -6,9 +6,10 @@ FER-2013 dataset
   the Kaggle mirror deadskull7/fer2013 (listed there as CC0). The dataset is
   not redistributed in this repository.
 
-YuNet face detector (face_detection_yunet_2023mar.onnx)
+YuNet face detector (face_detection_yunet_2026may.onnx)
   From the OpenCV Zoo, https://github.com/opencv/opencv_zoo, MIT License.
-  Downloaded at build time; not stored in this repository.
+  Downloaded at build time; not stored in this repository. The 2023mar file is
+  downloaded only for tests, as OpenCV's reference.
 
 Test fixture tests/serving/fixtures/face.jpg
   A crop of a NASA astronaut portrait (public domain) distributed with

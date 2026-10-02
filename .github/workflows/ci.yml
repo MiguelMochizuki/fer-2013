@@ -45,7 +45,7 @@ jobs:
         run: |
           RELEASE_URL=$(sed -n 's/^ARG RELEASE_URL=//p' Dockerfile)
           ONLY_YUNET=1 scripts/fetch_models.sh models serving/models.sha256
-          WEB=1 RELEASE_URL="$RELEASE_URL" scripts/fetch_models.sh models serving/models.sha256
+          RELEASE_URL="$RELEASE_URL" scripts/fetch_models.sh models serving/models.sha256
       - run: npm ci --prefix web
       - run: npm test --prefix web
       - name: Golden files are fresh

@@ -247,7 +247,7 @@ curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
 }
 ```
 
-`probabilities` and `confidence` are calibrated (see Calibration). `GET /` is a small demo page, `GET /docs` the OpenAPI UI, `GET /health` reports the loaded model hash and its calibration temperature (`null` for models exported before calibration existed). Faces are found with [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) (MIT).
+`probabilities` and `confidence` are calibrated (see Calibration). `GET /` is a small demo page, `GET /docs` the OpenAPI UI, `GET /health` reports the loaded model hash and its calibration temperature (`null` for models exported before calibration existed). Faces are found with [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) (MIT), the same model file the browser demo uses.
 
 ### Run it
 
@@ -284,7 +284,7 @@ Latency measured with `scripts/benchmark.py` against the Docker image (a 260x260
 
 Restricted to the size of a typical free hosting tier (`docker run --cpus 0.1 --memory 512m`, 15 requests, two repeated runs): about 1.8 to 2.0 s p50 without `explain` and 2.3 to 2.6 s with it, a boot of about 30 s, and 212 MiB of memory in use. It fits a 512 MB instance, but it is slow on a tenth of a core.
 
-Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus PyTorch 24.1 ms. The Docker image is 742 MB on disk (330 MB of Python packages, 43 MB of models); an environment with PyTorch and its CUDA wheels is over 4 GB.
+Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus PyTorch 24.1 ms. The Docker image is 504 MB on disk and 143 MB compressed (162 MB of Python packages, 43 MB of models, the rest the Python base image). It has no OpenCV: YuNet runs on ONNX Runtime with the decoding and NMS in numpy (`serving/detector.py`), which took the image from 742 MB and left the latency unchanged (22.5 ms p50 versus 22.9 ms). A test checks its boxes against `cv2.FaceDetectorYN`. An environment with PyTorch and its CUDA wheels is over 4 GB.
 
 ## Limitations and privacy
 
@@ -312,7 +312,7 @@ Build and run it locally:
 
 ```bash
 cd web && npm ci && npm test && cd ..
-WEB=1 RELEASE_URL=<models release url> scripts/fetch_models.sh models serving/models.sha256
+RELEASE_URL=<models release url> scripts/fetch_models.sh models serving/models.sha256
 node web/build.mjs --models models --out web/dist
 python3 -m http.server -d web/dist 8000
 ```

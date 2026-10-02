@@ -40,7 +40,7 @@ CHUNK = 64 * 1024
 STATIC_DIR = Path(__file__).parent / "static"
 CLASSIFIER_FILE = "fer_resnet18.onnx"
 FC_WEIGHT_FILE = "fer_fc_weight.npy"
-DETECTOR_FILE = "face_detection_yunet_2023mar.onnx"
+DETECTOR_FILE = "face_detection_yunet_2026may.onnx"
 
 # Keep uploads (<= limit) in memory instead of spooling them to a temp file.
 MultiPartParser.spool_max_size = MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD
