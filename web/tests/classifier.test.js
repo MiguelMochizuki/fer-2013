@@ -38,7 +38,7 @@ test("EMOTIONS na ordem do treino", () => {
   assert.deepEqual([...EMOTIONS], ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]);
 });
 
-test("probs do WASM batem com o Python até 1e-4", { skip }, async () => {
+test("WASM probs match Python within 1e-4", { skip }, async () => {
   const clf = await realClassifier();
   assert.ok(allFaces.length >= 3);
   for (const f of allFaces) {
@@ -47,7 +47,7 @@ test("probs do WASM batem com o Python até 1e-4", { skip }, async () => {
   }
 });
 
-test("features batem com o Python até 1e-3", { skip }, async () => {
+test("features match Python within 1e-3", { skip }, async () => {
   const clf = await realClassifier();
   const f = allFaces.find((x) => x.name === gold.features_fixture);
   const { features } = await clf.classify(inputFromPlane(f.plane), 1);
@@ -56,7 +56,7 @@ test("features batem com o Python até 1e-3", { skip }, async () => {
   assert.ok(maxDiff([...features], [...want]) <= 1e-3);
 });
 
-test("lote de 3 dá o mesmo que três chamadas de 1 (até 1e-5)", { skip }, async () => {
+test("a batch of 3 gives the same as three calls of 1 (within 1e-5)", { skip }, async () => {
   const clf = await realClassifier();
   const three = allFaces.slice(0, 3);
   const batch = new Float32Array(3 * 3 * 224 * 224);
@@ -66,11 +66,11 @@ test("lote de 3 dá o mesmo que três chamadas de 1 (até 1e-5)", { skip }, asyn
   assert.equal(features.length, 3 * 512 * 49);
   for (let k = 0; k < 3; k++) {
     const single = await clf.classify(inputFromPlane(three[k].plane), 1);
-    assert.ok(maxDiff([...probs.subarray(k * 7, k * 7 + 7)], [...single.probs]) <= 1e-5, `rosto ${k}`);
+    assert.ok(maxDiff([...probs.subarray(k * 7, k * 7 + 7)], [...single.probs]) <= 1e-5, `face ${k}`);
   }
 });
 
-test("probs somam 1 por rosto", { skip }, async () => {
+test("probs sum to 1 per face", { skip }, async () => {
   const clf = await realClassifier();
   const { probs } = await clf.classify(inputFromPlane(allFaces[0].plane), 1);
   assert.ok(Math.abs([...probs].reduce((a, b) => a + b, 0) - 1) < 1e-5);

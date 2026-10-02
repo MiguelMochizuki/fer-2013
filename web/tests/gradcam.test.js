@@ -18,7 +18,7 @@ const loadFc = () => {
   return parseNpy(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)).data;
 };
 
-test("mapa 7x7 igual ao Python nas 7 classes até 1e-4", { skip }, () => {
+test("7x7 map matches Python for all 7 classes within 1e-4", { skip }, () => {
   const fc = loadFc();
   const features = floats(cls.features_f32_b64);
   gold.cams.forEach((want, c) => {
@@ -29,7 +29,7 @@ test("mapa 7x7 igual ao Python nas 7 classes até 1e-4", { skip }, () => {
   });
 });
 
-test("features zeradas dão zeros sem NaN", { skip }, () => {
+test("all-zero features give zeros, not NaN", { skip }, () => {
   const cam = gradcamPP(new Float32Array(512 * 49), loadFc(), 3);
   assert.ok(cam.every((v) => v === 0));
 });
@@ -42,7 +42,7 @@ test("mapa fica em [0,1]", { skip }, () => {
   assert.ok(cam.some((v) => v > 0));
 });
 
-test("overlay RGBA 128x128, alfa 255, até 1 nível do Python", () => {
+test("RGBA 128x128 overlay, alpha 255, within 1 level of Python", () => {
   const face = pre.fixtures[gold.fixture].faces[0];
   const gray = Uint8Array.from(Buffer.from(face.crop_b64, "base64"));
   const cam = Float32Array.from(gold.cams[gold.overlay_class]);
@@ -54,5 +54,5 @@ test("overlay RGBA 128x128, alfa 255, até 1 nível do Python", () => {
     assert.equal(rgba[i + 3], 255);
     for (let c = 0; c < 3; c++) max = Math.max(max, Math.abs(rgba[i + c] - want[j + c]));
   }
-  assert.ok(max <= 1, `diferença máxima ${max}`);
+  assert.ok(max <= 1, `max difference ${max}`);
 });

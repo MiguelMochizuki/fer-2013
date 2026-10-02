@@ -40,19 +40,19 @@ async function pipeline() {
   return cached;
 }
 
-test("analyze reproduz o Python nas três fixtures", { skip }, async () => {
+test("analyze reproduces Python on the three fixtures", { skip }, async () => {
   const p = await pipeline();
   for (const [name, want] of Object.entries(golden.fixtures)) {
     const { rgb, w, h } = fixture(name);
     const got = await p.analyze(rgb, w, h);
     assert.deepEqual(got.image, { width: w, height: h });
-    assert.equal(got.faces.length, want.faces.length, `${name}: rostos`);
+    assert.equal(got.faces.length, want.faces.length, `${name}: faces`);
     got.faces.forEach((f, i) => {
       const t = want.faces[i];
-      assert.equal(f.emotion, t.emotion, `${name}[${i}] emoção`);
-      assert.ok(Math.abs(f.confidence - t.confidence) <= 0.01, `${name}[${i}] confiança ${f.confidence} vs ${t.confidence}`);
+      assert.equal(f.emotion, t.emotion, `${name}[${i}] emotion`);
+      assert.ok(Math.abs(f.confidence - t.confidence) <= 0.01, `${name}[${i}] confidence ${f.confidence} vs ${t.confidence}`);
       assert.ok(iou(f.box, t.box) >= 0.99, `${name}[${i}] IoU ${iou(f.box, t.box)}`);
-      assert.ok(Number.isInteger(f.box.x) && Number.isInteger(f.box.w), "caixas inteiras como no Python");
+      assert.ok(Number.isInteger(f.box.x) && Number.isInteger(f.box.w), "integer boxes as in Python");
       const maxCam = t.cam.reduce((m, v, k) => Math.max(m, Math.abs(v - f.cam[k])), 0);
       assert.ok(maxCam <= 1e-3, `${name}[${i}] mapa ${maxCam}`);
       assert.equal(f.heatmap.length, 128 * 128 * 4);
@@ -61,7 +61,7 @@ test("analyze reproduz o Python nas três fixtures", { skip }, async () => {
   }
 });
 
-test("explain false não calcula heatmap", { skip }, async () => {
+test("explain false does not compute a heatmap", { skip }, async () => {
   const p = await pipeline();
   const { rgb, w, h } = fixture("face.png");
   const got = await p.analyze(rgb, w, h, { explain: false });
@@ -97,10 +97,10 @@ test("many faces: all of them come back, in more than one classifier batch", { s
   }
 });
 
-test("RGBA com alfa variado dá o mesmo resultado que RGB", { skip }, async () => {
+test("RGBA with varying alpha gives the same result as RGB", { skip }, async () => {
   const p = await pipeline();
   const { rgb, rgba, w, h } = fixture("face.png");
-  for (let i = 3; i < rgba.length; i += 4) rgba[i] = (i >> 2) % 256; // alfa variado
+  for (let i = 3; i < rgba.length; i += 4) rgba[i] = (i >> 2) % 256; // varying alpha
   const a = await p.analyze(rgb, w, h, { explain: false });
   const b = await p.analyze(rgba, w, h, { explain: false, stride: 4 });
   assert.equal(b.faces.length, a.faces.length);
@@ -108,13 +108,13 @@ test("RGBA com alfa variado dá o mesmo resultado que RGB", { skip }, async () =
   assert.ok(Math.abs(b.faces[0].confidence - a.faces[0].confidence) < 1e-6);
 });
 
-test("imagem sem rosto devolve faces vazias", { skip }, async () => {
+test("an image without a face returns no faces", { skip }, async () => {
   const p = await pipeline();
   const got = await p.analyze(new Uint8Array(300 * 300 * 3).fill(128), 300, 300);
   assert.deepEqual(got.faces, []);
 });
 
-test("timings são números não negativos e total >= detect", { skip }, async () => {
+test("timings are non-negative numbers and total >= detect", { skip }, async () => {
   const p = await pipeline();
   const { rgb, w, h } = fixture("face.png");
   const { timings } = await p.analyze(rgb, w, h);

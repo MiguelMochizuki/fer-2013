@@ -24,9 +24,9 @@ function emptyOutputs(H, W) {
   return out;
 }
 
-test("decodeYunet decodifica uma célula conhecida", () => {
-  const out = emptyOutputs(32, 64); // grade 4x8 no stride 8
-  const idx = 2 * 8 + 3; // linha 2, coluna 3
+test("decodeYunet decodes a known cell", () => {
+  const out = emptyOutputs(32, 64); // 4x8 grid at stride 8
+  const idx = 2 * 8 + 3; // row 2, column 3
   out.cls_8[idx] = 0.81;
   out.obj_8[idx] = 0.81;
   out.bbox_8.set([0.5, 0.25, Math.log(2), Math.log(3)], idx * 4);
@@ -47,9 +47,9 @@ test("decodeYunet descarta scores abaixo do limiar", () => {
   assert.equal(decodeYunet(out, 32, 64, 0.6).length, 0);
 });
 
-test("nms mantém o de maior score e descarta IoU > 0.3", () => {
+test("nms keeps the highest score and drops IoU > 0.3", () => {
   const a = { x: 0, y: 0, w: 10, h: 10, score: 0.9 };
-  const b = { x: 3, y: 0, w: 10, h: 10, score: 0.8 }; // IoU 0.54 com a
+  const b = { x: 3, y: 0, w: 10, h: 10, score: 0.8 }; // IoU 0.54 with a
   const c = { x: 100, y: 100, w: 10, h: 10, score: 0.7 };
   assert.deepEqual(nms([b, c, a], 0.3), [a, c]);
 });
@@ -72,7 +72,7 @@ function stubOrt() {
   return { ort: { Tensor }, session, calls };
 }
 
-test("preenche para múltiplo de 32 sem ampliar", async () => {
+test("pads to a multiple of 32 without scaling up", async () => {
   const { ort, session, calls } = stubOrt();
   await createYuNetDetector(ort, session).detect(new Uint8Array(100 * 70 * 3), 100, 70);
   assert.deepEqual(calls[0].dims, [1, 3, 96, 128]);
@@ -84,20 +84,20 @@ test("reduz o maior lado a 640 antes de detectar", async () => {
   assert.deepEqual(calls[0].dims, [1, 3, 320, 640]);
 });
 
-test("a entrada é BGR 0 a 255 com zeros no preenchimento", async () => {
+test("the input is BGR 0 to 255 with zeros in the padding", async () => {
   const { ort, session, calls } = stubOrt();
   const rgb = new Uint8Array(2 * 1 * 3);
-  rgb.set([10, 20, 30, 40, 50, 60]); // dois pixels RGB
+  rgb.set([10, 20, 30, 40, 50, 60]); // two RGB pixels
   await createYuNetDetector(ort, session).detect(rgb, 2, 1);
   const t = calls[0];
   assert.deepEqual(t.dims, [1, 3, 32, 32]);
   const plane = 32 * 32;
-  assert.deepEqual([t.data[0], t.data[plane], t.data[2 * plane]], [30, 20, 10]); // B, G, R do pixel 0
+  assert.deepEqual([t.data[0], t.data[plane], t.data[2 * plane]], [30, 20, 10]); // B, G, R of pixel 0
   assert.deepEqual([t.data[1], t.data[plane + 1], t.data[2 * plane + 1]], [60, 50, 40]);
   assert.equal(t.data[2], 0);
 });
 
-test("reescala as caixas de volta para a imagem original", async () => {
+test("scales the boxes back to the original image", async () => {
   const calls = [];
   class Tensor {
     constructor(type, data, dims) {
@@ -108,14 +108,14 @@ test("reescala as caixas de volta para a imagem original", async () => {
     async run(feeds) {
       calls.push(feeds.input.dims);
       const out = emptyOutputs(320, 640);
-      const idx = 2 * (640 / 8) + 3; // linha 2, coluna 3 numa grade de 80 colunas
+      const idx = 2 * (640 / 8) + 3; // row 2, column 3 in an 80-column grid
       out.cls_8[idx] = 0.81;
       out.obj_8[idx] = 0.81;
       out.bbox_8.set([0.5, 0.25, Math.log(2), Math.log(3)], idx * 4);
       return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, { data: v }]));
     },
   };
-  // 1200x600 -> 640x320 (scale 0.5333...): a caixa (20, 6, 16, 24) volta multiplicada por 1/scale
+  // 1200x600 -> 640x320 (scale 0.5333...): the box (20, 6, 16, 24) comes back multiplied by 1/scale
   const [box] = await createYuNetDetector({ Tensor }, session).detect(new Uint8Array(1200 * 600 * 3), 1200, 600);
   const scale = 640 / 1200;
   near(box.x, 20 / scale, 1e-3, "x");
@@ -137,13 +137,13 @@ async function realDetector() {
   return createYuNetDetector(ort, session);
 }
 
-test("detect: contagem, caixas e scores iguais ao OpenCV", { skip: !existsSync(MODEL) }, async () => {
+test("detect: count, boxes and scores match OpenCV", { skip: !existsSync(MODEL) }, async () => {
   const detector = await realDetector();
   for (const [name, want] of Object.entries(golden.fixtures)) {
     const { rgb, w, h } = fixtureRgb(name);
     const got = await detector.detect(rgb, w, h);
-    assert.equal(got.length, want.faces.length, `${name}: número de rostos`);
-    assert.ok(got.length >= 1, `${name}: a fixture deveria ter rosto`);
+    assert.equal(got.length, want.faces.length, `${name}: number of faces`);
+    assert.ok(got.length >= 1, `${name}: the fixture should contain a face`);
     got.forEach((g, i) => {
       assert.ok(iou(g, want.faces[i]) >= 0.999, `${name}[${i}] IoU ${iou(g, want.faces[i])}`);
       near(g.score, want.faces[i].score, 1e-3, `${name}[${i}] score`);
@@ -151,7 +151,7 @@ test("detect: contagem, caixas e scores iguais ao OpenCV", { skip: !existsSync(M
   }
 });
 
-test("imagem fina ou minúscula devolve lista vazia", { skip: !existsSync(MODEL) }, async () => {
+test("a thin or tiny image returns an empty list", { skip: !existsSync(MODEL) }, async () => {
   const detector = await realDetector();
   for (const [w, h] of [[5000, 2], [1, 1], [3000, 5], [2, 5000]]) {
     assert.deepEqual(await detector.detect(new Uint8Array(w * h * 3), w, h), [], `${w}x${h}`);

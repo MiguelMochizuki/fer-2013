@@ -20,7 +20,7 @@ function fixtureRgb(name) {
 }
 const byKind = (kind) => golden.cases.filter((c) => c.kind === kind);
 
-test("resizeU8 idêntico byte a byte ao Pillow", () => {
+test("resizeU8 is byte-identical to Pillow", () => {
   for (const c of byKind("u8")) {
     const input = c.input_fixture ? fixtureRgb(c.input_fixture) : bytes(c.input_b64);
     const out = resizeU8(input, c.w, c.h, c.channels, c.out_w, c.out_h, c.filter);
@@ -33,7 +33,7 @@ test("resizeU8 idêntico byte a byte ao Pillow", () => {
   }
 });
 
-test("resizeF32 até 1e-4 do Pillow", () => {
+test("resizeF32 within 1e-4 of Pillow", () => {
   for (const c of byKind("f32")) {
     const out = resizeF32(floats(c.input_f32_b64), c.w, c.h, c.out_w, c.out_h, c.filter);
     const want = floats(c.output_f32_b64);
@@ -44,14 +44,14 @@ test("resizeF32 até 1e-4 do Pillow", () => {
   }
 });
 
-test("rgbToGray igual ao Pillow e ignora o alfa", () => {
+test("rgbToGray matches Pillow and ignores alpha", () => {
   for (const c of byKind("gray")) {
     const out = rgbToGray(bytes(c.input_b64), c.w, c.h, c.stride);
     assert.deepEqual(out, bytes(c.output_b64), c.name);
   }
 });
 
-test("pesos de cada pixel de saída somam 1", () => {
+test("the weights of each output pixel sum to 1", () => {
   for (const [inSize, outSize] of [[260, 130], [135, 48], [24, 48], [48, 224], [800, 640], [7, 128]]) {
     for (const filter of ["bilinear", "bicubic", "lanczos"]) {
       const { count, ksize, weights } = computeCoefficients(inSize, outSize, filter);
@@ -64,7 +64,7 @@ test("pesos de cada pixel de saída somam 1", () => {
   }
 });
 
-test("tamanho igual devolve uma cópia", () => {
+test("the same size returns a copy", () => {
   const src = Uint8Array.from([1, 2, 3, 4, 5, 6]);
   const out = resizeU8(src, 2, 1, 3, 2, 1, "lanczos");
   assert.deepEqual(out, src);

@@ -18,7 +18,7 @@ function makeNpy(shape, values, { descr = "<f4", fortran = false } = {}) {
   return out.buffer;
 }
 
-test("lê float32 little-endian em ordem C", () => {
+test("reads little-endian float32 in C order", () => {
   const values = Float32Array.from({ length: 7 * 512 }, (_, i) => i / 100);
   const { shape, data } = parseNpy(makeNpy([7, 512], values));
   assert.deepEqual(shape, [7, 512]);
@@ -27,7 +27,7 @@ test("lê float32 little-endian em ordem C", () => {
   assert.equal(data[513], Math.fround(5.13));
 });
 
-test("aceita shape de uma dimensão com vírgula final", () => {
+test("accepts a one-dimension shape with a trailing comma", () => {
   const { shape, data } = parseNpy(makeNpy([3], Float32Array.of(1, 2, 3)));
   assert.deepEqual(shape, [3]);
   assert.deepEqual([...data], [1, 2, 3]);
@@ -40,7 +40,7 @@ test("rejeita fortran_order e dtype diferente de float32", () => {
 });
 
 const REAL = new URL("../../models/fer_fc_weight.npy", import.meta.url);
-test("lê o fc_weight real igual ao numpy", { skip: !existsSync(REAL) }, async () => {
+test("reads the real fc_weight the same as numpy", { skip: !existsSync(REAL) }, async () => {
   const buf = await readFile(REAL);
   const { shape, data } = parseNpy(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   assert.deepEqual(shape, [7, 512]);

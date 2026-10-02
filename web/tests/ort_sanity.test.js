@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 
 const MODEL = new URL("../../models/fer_resnet18.onnx", import.meta.url);
 
-test("o classificador roda no WASM do Node com 3 saídas", { skip: !existsSync(MODEL) }, async () => {
+test("the classifier runs on Node's WASM with 3 outputs", { skip: !existsSync(MODEL) }, async () => {
   const ort = await import("onnxruntime-web");
   ort.env.wasm.numThreads = 1;
   const session = await ort.InferenceSession.create(await readFile(MODEL), {

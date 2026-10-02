@@ -25,11 +25,11 @@ test("validateFile aceita os formatos permitidos dentro dos limites", () => {
   assert.deepEqual(validateFile({ size: 10 * MB, type: "image/png" }, { width: 5000, height: 5000 }), { ok: true });
 });
 
-test("validateFile: o formato vem antes do tamanho", () => {
+test("validateFile: the format is checked before the size", () => {
   assert.equal(validateFile({ size: 50 * MB, type: "image/gif" }).code, "format");
 });
 
-test("rankProbabilities ordena e preserva os 7 rótulos", () => {
+test("rankProbabilities sorts and keeps the 7 labels", () => {
   const ranked = rankProbabilities({ angry: 0.1, disgust: 0.02, fear: 0.03, happy: 0.6, sad: 0.05, surprise: 0.04, neutral: 0.16 });
   assert.equal(ranked.length, 7);
   assert.deepEqual(ranked.map((r) => r.label).slice(0, 3), ["happy", "neutral", "angry"]);
