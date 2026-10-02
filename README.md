@@ -18,9 +18,10 @@ Facial expression recognition with a ResNet18 trained on [FER-2013](https://www.
 |---|---|
 | Test accuracy / macro-F1 | 0.707 / 0.709 |
 | Calibration (test ECE, 15 bins) | 0.168 before, 0.022 after temperature scaling (T = 2.40) |
-| ONNX versus PyTorch, full test set | 70.80% versus 70.74%, 99.94% identical predictions |
-| Face to result, in the browser (Chromium, one face) | about 115 ms: detection 11, classification 100, Grad-CAM++ 4 |
-| API latency (p50, one face, no CPU limit) | 23 ms, 26 ms with the heatmap |
+| Shipped model: int8 (11 MB) versus fp32 (45 MB), full test set | 70.86% versus 70.80% accuracy, 97.5% identical predictions |
+| Face to result, in the browser (Chromium, one face) | about 150 ms: detection 20 to 30, classification 125, Grad-CAM++ 4 |
+| API latency (p50, one face, no CPU limit) | 10 ms, 14 ms with the heatmap |
+| Docker image | 438 MB on disk, 111 MB compressed (it was 742 MB and 209 MB) |
 
 Details, per-class numbers and plots are in [Results](#results). The model is about 71% accurate on a noisy dataset: see [Limitations](#limitations-and-privacy) before reading anything into one prediction.
 
@@ -46,7 +47,7 @@ curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
 4. **Evaluate**: metrics, confusion matrix and precision-recall curves for the best checkpoint.
 5. **Explain**: Grad-CAM++ on the same checkpoint, to see which regions of the face drive correct and incorrect predictions.
 6. **Calibrate**: fit one temperature on the validation split so the reported confidences match how often the model is right.
-7. **Serve**: export to ONNX and run it behind the [API](#api) or in the [browser](#browser-demo).
+7. **Serve**: export to ONNX, quantize to int8, and run it behind the [API](#api) or in the [browser](#browser-demo).
 
 The seven emotions are `angry`, `disgust`, `fear`, `happy`, `sad`, `surprise` and `neutral`.
 
@@ -93,8 +94,10 @@ uv run python scripts/gradcam_report.py --checkpoint checkpoints/best.pt --split
 # 6. Calibrate the confidences (writes reports/calibration.json and a reliability diagram)
 uv run python scripts/calibrate.py --checkpoint checkpoints/best.pt
 
-# 7. Export to ONNX for the API with that temperature (see the API section)
+# 7. Export to ONNX with that temperature, then quantize to int8 (see Quantization)
 uv run python scripts/export_onnx.py --checkpoint checkpoints/best.pt --out-dir models/ --calibration reports/calibration.json
+mv models/fer_resnet18.onnx models/fer_resnet18_fp32.onnx
+uv run python scripts/quantize_onnx.py --model models/fer_resnet18_fp32.onnx --out models/fer_resnet18.onnx
 ```
 
 Training writes checkpoints to `checkpoints/`, TensorBoard logs to `runs/`, and a per-epoch history JSON to `reports/`. View training progress with:
@@ -225,6 +228,17 @@ Regenerate with:
 uv run python scripts/calibrate.py --checkpoint checkpoints/best.pt
 ```
 
+### Quantization
+
+The shipped classifier is quantized to int8 after export: static QDQ quantization with per-channel weights, MinMax calibration on 300 random training faces, and the softmax kept in float so `probs` stay exact. The graph, its three outputs and the temperature metadata are unchanged, so nothing downstream knows the difference except the size and the speed. `scripts/quantize_onnx.py` refuses to write a model that agrees with the fp32 one on fewer than 95% of 1,000 validation faces or loses more than a point of accuracy.
+
+| Model | Test accuracy | Macro-F1 | ECE (T refit on val) | Size | One image (2 threads) |
+|-------|---------------|----------|----------------------|------|-----------------------|
+| fp32 | 0.7080 | 0.7095 | 0.0234 (T = 2.395) | 44.7 MB | 17.2 ms |
+| int8 | 0.7086 | 0.7098 | 0.0243 (T = 2.391) | 11.3 MB | 5.8 ms |
+
+Accuracy, macro-F1 and calibration stay within noise (the standard error of the accuracy is about 0.8 points); 97.5% of predictions equal the fp32 ones, and the Grad-CAM++ maps correlate 0.999 with the fp32 maps (worst face 0.993). The temperature refit on the int8 logits is the same to three digits, so the T stored in the model was kept. int8 kernels round a few activations differently in ONNX Runtime Web than in native ONNX Runtime, so the browser's probabilities differ from Python's by up to 3e-3. The fp32 model is still published in the model release for tests and comparison.
+
 ## API
 
 A FastAPI service wraps the trained model: upload a photo, get one result per detected face (box, emotion, probabilities and, on request, a Grad-CAM++ heatmap). Inference runs on ONNX Runtime, so the image has no PyTorch in it.
@@ -252,8 +266,10 @@ curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
 ### Run it
 
 ```bash
-# export the trained checkpoint (needs torch) and fetch the face detector
+# export the trained checkpoint (needs torch), quantize it, and fetch the face detector
 uv run python scripts/export_onnx.py --checkpoint checkpoints/best.pt --out-dir models/
+mv models/fer_resnet18.onnx models/fer_resnet18_fp32.onnx
+uv run python scripts/quantize_onnx.py --model models/fer_resnet18_fp32.onnx --out models/fer_resnet18.onnx
 ONLY_YUNET=1 scripts/fetch_models.sh models serving/models.sha256
 MODELS_DIR=models uv run uvicorn fer_2013.serving.api:create_app --factory --port 7860
 ```
@@ -273,18 +289,18 @@ The head is `avgpool -> Dropout -> Linear`, so in eval mode the gradient of a cl
 
 ### Performance
 
-The exported model reproduces the PyTorch one: through the ONNX Runtime pipeline with the serving preprocessing, the full test set scores 70.80% accuracy against 70.74% in PyTorch, and 99.94% of predictions are identical (2 of 3,589 differ).
+The shipped int8 model scores 70.86% on the full test set through the ONNX Runtime pipeline with the serving preprocessing, against 70.80% for the fp32 ONNX model and 70.74% for PyTorch (see Quantization).
 
-Latency measured with `scripts/benchmark.py` against the Docker image (a 260x260 image with one face; `p50` / `p95` of the full request). On a 12th Gen Intel i5-12450HX with no CPU limit, 50 requests:
+Latency measured with `scripts/benchmark.py` against the Docker image (a 260x260 image with one face; `p50` / `p95` of the full request). On a 12th Gen Intel i5-12450HX with no CPU limit, 60 requests:
 
 | Request            | p50 (ms) | p95 (ms) |
 |--------------------|----------|----------|
-| `explain=false`    | 22.9     | 27.6     |
-| `explain=true`     | 26.0     | 32.8     |
+| `explain=false`    | 10.4     | 11.3     |
+| `explain=true`     | 14.5     | 16.3     |
 
-Restricted to the size of a typical free hosting tier (`docker run --cpus 0.1 --memory 512m`, 15 requests, two repeated runs): about 1.8 to 2.0 s p50 without `explain` and 2.3 to 2.6 s with it, a boot of about 30 s, and 212 MiB of memory in use. It fits a 512 MB instance, but it is slow on a tenth of a core.
+Restricted to the size of a typical free hosting tier (`docker run --cpus 0.1 --memory 512m`, 15 requests): about 1.3 s p50 without `explain` and 1.6 s with it, a boot of about 33 s, and 94 MiB of memory in use. It fits a 512 MB instance with room to spare. (With the fp32 model and OpenCV it was 1.8 to 2.0 s and 212 MiB.) The detector session is single-threaded on purpose: two ONNX Runtime threads busy-waiting on a tenth of a core made it three times slower.
 
-Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus PyTorch 24.1 ms. The Docker image is 504 MB on disk and 143 MB compressed (162 MB of Python packages, 43 MB of models, the rest the Python base image). It has no OpenCV: YuNet runs on ONNX Runtime with the decoding and NMS in numpy (`serving/detector.py`), which took the image from 742 MB and left the latency unchanged (22.5 ms p50 versus 22.9 ms). A test checks its boxes against `cv2.FaceDetectorYN`. An environment with PyTorch and its CUDA wheels is over 4 GB.
+Classifier alone, one 224x224 image, 2 threads: int8 5.8 ms p50, fp32 17.2 ms, PyTorch 24.1 ms. The Docker image is 438 MB on disk and 111 MB compressed (162 MB of Python packages, 11 MB of models, the rest the Python base image). It has no OpenCV: YuNet runs on ONNX Runtime with the decoding and NMS in numpy (`serving/detector.py`), and a test checks its boxes against `cv2.FaceDetectorYN`. Together with the int8 model that took the image from 742 MB. An environment with PyTorch and its CUDA wheels is over 4 GB.
 
 ## Limitations and privacy
 
@@ -302,9 +318,9 @@ Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus 
 How it works:
 - With several faces, a strip of crops lets you pick one at a time (or click its box on the photo); the reading, crop and heatmap follow the selection.
 - Plain ES modules, no bundler. `onnxruntime-web` runs in a Web Worker with WebAssembly and one thread, because GitHub Pages cannot send the headers that threads need.
-- Every stage is tested in Node against golden files written by the Python pipeline (`scripts/make_web_golden.py`): resampling is byte-identical to Pillow, detector boxes match OpenCV (IoU at least 0.999), probabilities and Grad-CAM++ maps agree within 1e-4. A Python test fails when the golden files go stale, and the site build fails when the models differ from the ones the golden files were made for.
+- Every stage is tested in Node against golden files written by the Python pipeline (`scripts/make_web_golden.py`): resampling is byte-identical to Pillow, detector boxes match OpenCV (IoU at least 0.999), probabilities agree within 1e-2 and Grad-CAM++ maps within 2e-2 (the int8 classifier rounds a few activations differently in WebAssembly, see Quantization). A Python test fails when the golden files go stale, and the site build fails when the models differ from the ones the golden files were made for.
 - The models are downloaded on first use, checked against their sha256 and kept in the browser cache, so later visits do not download them again.
-- Measured in Chromium on a desktop, with one face: detection about 11 ms, classification about 100 ms, Grad-CAM++ about 4 ms; three faces take about 400 ms in total. A first visit downloads about 59 MB (the 45 MB model and the 14 MB runtime).
+- Measured in Chromium on a desktop, with one face: detection about 11 ms, classification about 125 ms, Grad-CAM++ about 4 ms; roughly 100 ms more per extra face. A first visit downloads about 26 MB (the 11 MB model and the 14 MB runtime).
 - PNGs with transparency: the browser's canvas stores premultiplied alpha, so fully transparent pixels reach the model as black, whereas Pillow keeps the stored RGB. Opaque images are unaffected.
 - A JPEG decoded by Chromium gives probabilities that differ from Pillow's by 6e-8 on the example photo, and the same box. Other browsers may decode JPEG slightly differently.
 
@@ -323,6 +339,7 @@ The site is published to GitHub Pages from `main` by `.github/workflows/pages.ym
 
 - `v*` tags are the application (code, API image, site). Each creates a GitHub Release from CI.
 - `models-v*` tags are the trained weights. They are marked **pre-release** on purpose and must not be deleted: the `Dockerfile`, `scripts/fetch_models.sh`, CI and the Pages build download the weights from them, and `serving/models.sha256` pins their hashes.
+- `models-v1.2.0` is the int8 classifier (with the fp32 one attached for tests).
 - Model versions follow semver in spirit: major when the serving contract changes (architecture, input normalization, labels), minor for a retrain, patch for a re-export.
 
 ## Development

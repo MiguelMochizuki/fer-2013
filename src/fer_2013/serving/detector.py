@@ -98,7 +98,7 @@ class YuNetDetector:
         nms_threshold: float = 0.3,
     ) -> None:
         opts = ort.SessionOptions()
-        opts.intra_op_num_threads = 2
+        opts.intra_op_num_threads = 1
         self._sess = ort.InferenceSession(
             str(model_path), opts, providers=["CPUExecutionProvider"]
         )
