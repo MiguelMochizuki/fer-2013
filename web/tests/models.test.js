@@ -61,7 +61,7 @@ function memoryCache() {
 }
 const eq = (buf, bytes) => assert.deepEqual(new Uint8Array(buf), bytes);
 
-test("baixa, confere o sha256, guarda no cache e reporta progresso crescente até o total", async () => {
+test("downloads, checks the sha256, caches, and reports growing progress up to the total", async () => {
   const cache = memoryCache();
   const seen = [];
   const out = await loadModels({ manifestUrl: MANIFEST_URL, fetchFn: fakeFetch(), cache, onProgress: (l, t) => seen.push([l, t]) });
@@ -71,18 +71,18 @@ test("baixa, confere o sha256, guarda no cache e reporta progresso crescente at�
   assert.equal(cache.store.size, 3);
   const total = 3000 + 700 + 120;
   assert.ok(seen.every(([, t]) => t === total));
-  assert.ok(seen.every(([l], i) => i === 0 || l >= seen[i - 1][0]), "progresso monotônico");
+  assert.ok(seen.every(([l], i) => i === 0 || l >= seen[i - 1][0]), "progress is monotonic");
   assert.equal(seen.at(-1)[0], total);
 });
 
-test("hash divergente lança ModelIntegrityError e não grava no cache", async () => {
+test("a hash mismatch throws ModelIntegrityError and writes nothing to the cache", async () => {
   const cache = memoryCache();
   const bad = new URL(paths.detector, MANIFEST_URL).href;
   await assert.rejects(loadModels({ manifestUrl: MANIFEST_URL, fetchFn: fakeFetch({ tamper: bad }), cache }), ModelIntegrityError);
   assert.equal(cache.store.has(bad), false);
 });
 
-test("rede cortada no meio lança ModelDownloadError e permite nova tentativa", async () => {
+test("a connection cut midway throws ModelDownloadError and allows a retry", async () => {
   const cache = memoryCache();
   const cut = new URL(paths.classifier, MANIFEST_URL).href;
   await assert.rejects(loadModels({ manifestUrl: MANIFEST_URL, fetchFn: fakeFetch({ cutOn: cut }), cache }), ModelDownloadError);
@@ -91,12 +91,12 @@ test("rede cortada no meio lança ModelDownloadError e permite nova tentativa", 
   eq(out.classifier, blobs.classifier);
 });
 
-test("resposta HTTP de erro lança ModelDownloadError", async () => {
+test("an HTTP error response throws ModelDownloadError", async () => {
   const fetchFn = async (url) => (url === MANIFEST_URL ? new Response(JSON.stringify(manifest)) : new Response("nope", { status: 404 }));
   await assert.rejects(loadModels({ manifestUrl: MANIFEST_URL, fetchFn }), ModelDownloadError);
 });
 
-test("acerto no cache não chama fetch para o modelo", async () => {
+test("a cache hit does not fetch the model", async () => {
   const cache = memoryCache();
   await loadModels({ manifestUrl: MANIFEST_URL, fetchFn: fakeFetch(), cache });
   const second = fakeFetch();
@@ -107,7 +107,7 @@ test("acerto no cache não chama fetch para o modelo", async () => {
   assert.equal(seen.at(-1)[0], seen.at(-1)[1]);
 });
 
-test("entrada de cache corrompida é ignorada e baixada de novo", async () => {
+test("a corrupted cache entry is ignored and downloaded again", async () => {
   const cache = memoryCache();
   await loadModels({ manifestUrl: MANIFEST_URL, fetchFn: fakeFetch(), cache });
   const key = new URL(paths.fcWeight, MANIFEST_URL).href;
@@ -118,7 +118,7 @@ test("entrada de cache corrompida é ignorada e baixada de novo", async () => {
   assert.ok(f.calls.includes(key));
 });
 
-test("sem cache disponível (null) ainda funciona", async () => {
+test("works without a cache (null)", async () => {
   const out = await loadModels({ manifestUrl: MANIFEST_URL, fetchFn: fakeFetch(), cache: null });
   eq(out.classifier, blobs.classifier);
 });

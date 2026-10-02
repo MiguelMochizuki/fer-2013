@@ -42,7 +42,7 @@ class YuNetDetector:
         model_path: Path,
         score_threshold: float = 0.6,
         max_side: int = 640,
-        max_faces: int = 10,
+        max_faces: int | None = None,
     ) -> None:
         self._det = cv2.FaceDetectorYN.create(
             str(model_path), "", (320, 320), score_threshold
@@ -76,4 +76,4 @@ class YuNetDetector:
             for f in faces
         ]
         boxes.sort(key=lambda b: b.score, reverse=True)
-        return boxes[: self._max_faces]
+        return boxes if self._max_faces is None else boxes[: self._max_faces]

@@ -83,7 +83,7 @@ export function nms(boxes, iouThreshold) {
  * @param {{ scoreThreshold?: number, nmsThreshold?: number, maxSide?: number, maxFaces?: number }} [options]
  */
 export function createYuNetDetector(ort, session, options = {}) {
-  const { scoreThreshold = 0.6, nmsThreshold = 0.3, maxSide = 640, maxFaces = 10 } = options;
+  const { scoreThreshold = 0.6, nmsThreshold = 0.3, maxSide = 640, maxFaces = Infinity } = options;
   return {
     /**
      * @param {Uint8Array} rgb  w*h*3 bytes, row-major RGB

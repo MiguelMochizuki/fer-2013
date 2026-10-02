@@ -13,12 +13,12 @@
 
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyOrt } from "./scripts/copy-ort.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SITE_PARTS = ["index.html", "css", "src", "fonts", "icons", "examples"];
+const SITE_PARTS = ["index.html", "css", "src", "fonts", "icons", "licenses", "examples"];
 
 // manifest key -> [file in the models dir, extension, meta.json key holding its pinned sha256]
 const MODELS = {
@@ -29,10 +29,21 @@ const MODELS = {
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
+/** The build wipes `outDir`, so it must never be the sources, the repo, or a parent of either. */
+export function assertSafeOutDir(outDir) {
+  const target = resolve(outDir);
+  for (const dir of [HERE, resolve(HERE, "..")]) {
+    if (target === dir || dir.startsWith(target.endsWith(sep) ? target : target + sep)) {
+      throw new Error(`refusing to build into ${target}: it would delete ${dir}`);
+    }
+  }
+}
+
 /**
  * @param {{ modelsDir: string, outDir: string, metaPath?: string }} options
  */
 export async function build({ modelsDir, outDir, metaPath = join(HERE, "tests", "golden", "meta.json") }) {
+  assertSafeOutDir(outDir);
   const meta = JSON.parse(readFileSync(metaPath, "utf8"));
 
   const loaded = {};

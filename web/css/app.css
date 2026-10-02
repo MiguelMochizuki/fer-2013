@@ -117,7 +117,8 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 .boxes.in { opacity: 1; }
 .box { position: absolute; border: 2px solid var(--accent); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.55); transition: opacity 150ms ease; }
 .box .tag { position: absolute; left: -2px; top: -2px; transform: translateY(-100%); min-width: 24px; padding: 0 7px; background: var(--accent); color: var(--accent-ink); font: 700 0.8125rem/1.5 var(--sans); text-align: center; }
-.boxes.dim .box:not(.active) { opacity: 0.3; }
+.boxes.multi .box { pointer-events: auto; cursor: pointer; opacity: 0.6; }
+.boxes.multi .box.active, .boxes.multi .box:hover { opacity: 1; }
 
 /* ---------- progress / status / error ---------- */
 .progress { height: 2px; margin-top: 12px; overflow: hidden; }
@@ -125,6 +126,15 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 .status { min-height: 1.5em; margin: 12px 0 0; color: var(--muted); font-size: 0.9375rem; }
 .error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 0; border-block: 1px solid var(--danger); }
 .error p { margin: 0; flex: 1 1 220px; }
+
+/* face picker: shown only when there is more than one face */
+.strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.pick { position: relative; width: 56px; height: 56px; padding: 0; border: 2px solid transparent; background: var(--line); cursor: pointer; transition: border-color 150ms ease, transform 120ms var(--ease-out); }
+.pick:active { transform: scale(0.96); }
+.pick canvas { display: block; width: 100%; height: 100%; }
+.pick[aria-pressed="true"] { border-color: var(--accent); }
+.pick-n { position: absolute; left: 0; top: 0; min-width: 18px; padding: 0 4px; background: var(--accent); color: var(--accent-ink); font: 700 0.75rem/1.4 var(--sans); text-align: center; }
+@media (hover: hover) and (pointer: fine) { .pick:hover { border-color: var(--muted); } .pick[aria-pressed="true"]:hover { border-color: var(--accent); } }
 
 /* ---------- the reading: emotions typeset by probability ---------- */
 .faces { list-style: none; margin: 0; padding: 0; }
@@ -136,8 +146,6 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 }
 .face + .face { padding-top: 32px; border-top: 1px solid var(--line); }
 .face.in { opacity: 1; transform: none; }
-.face::before { content: ""; position: absolute; left: -14px; top: 8px; bottom: 40px; width: 3px; background: var(--accent); opacity: 0; transition: opacity 150ms ease; }
-.face.active::before { opacity: 1; }
 
 .words { --r: clamp(2.75rem, 8vw, 6.5rem); list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1em 0.7em; font-size: 1rem; }
 .face-tag { align-self: flex-start; margin: 0.45rem 0.25rem 0 0; min-width: 24px; padding: 0 7px; background: var(--accent); color: var(--accent-ink); font: 700 0.8125rem/1.5 var(--sans); text-align: center; }
@@ -169,6 +177,6 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 /* ---------- reduced motion: no movement, only short fades ---------- */
 @media (prefers-reduced-motion: reduce) {
   .photo, .face { transform: none; transition-property: opacity; transition-duration: 120ms; transition-delay: 0ms; }
-  .btn:active, .plate:active .plate-box, .plate:hover .plate-box { transform: none; }
+  .btn:active, .pick:active, .plate:active .plate-box, .plate:hover .plate-box { transform: none; }
   .progress-fill { transition: none; }
 }

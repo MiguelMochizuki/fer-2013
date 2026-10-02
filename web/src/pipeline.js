@@ -10,6 +10,9 @@ import { createYuNetDetector } from "./detector.js";
 import { gradcamPP, renderOverlay } from "./gradcam.js";
 import { cropSquareGray, toInput } from "./preprocess.js";
 
+/** Faces per classifier call: bounds the input tensor (about 600 KB per face) in a crowd. */
+const BATCH = 16;
+
 /**
  * @typedef {object} Face
  * @property {{ x: number, y: number, w: number, h: number }} box  integer pixels, inside the image
@@ -75,10 +78,21 @@ export function createPipeline({ ort, detectorSession, classifierSession, fcWeig
       let classifyMs = 0;
       let gradcamMs = 0;
       if (crops.length > 0) {
-        const inputs = new Float32Array(crops.length * 3 * 224 * 224);
-        crops.forEach(({ crop }, i) => inputs.set(toInput(crop.gray, crop.w, crop.h), i * 3 * 224 * 224));
+        const n = crops.length;
+        const probs = new Float32Array(n * 7);
+        const features = new Float32Array(n * 512 * 49);
         const c0 = performance.now();
-        const { probs, features } = await classifier.classify(inputs, crops.length);
+        for (let start = 0; start < n; start += BATCH) {
+          const m = Math.min(BATCH, n - start);
+          const inputs = new Float32Array(m * 3 * 224 * 224);
+          for (let j = 0; j < m; j++) {
+            const { crop } = crops[start + j];
+            inputs.set(toInput(crop.gray, crop.w, crop.h), j * 3 * 224 * 224);
+          }
+          const out = await classifier.classify(inputs, m);
+          probs.set(out.probs, start * 7);
+          features.set(out.features, start * 512 * 49);
+        }
         classifyMs = performance.now() - c0;
 
         const g0 = performance.now();

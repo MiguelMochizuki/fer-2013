@@ -97,16 +97,11 @@ export async function loadModels({
       }
     }
     if (!bytes) {
-      let downloaded = 0;
       try {
         const res = await fetchFn(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        bytes = await readBody(res, (n) => {
-          downloaded += n;
-          advance(n);
-        });
+        bytes = await readBody(res, advance);
       } catch (error) {
-        loaded -= downloaded; // this attempt is void; progress goes back for the next try
         throw new ModelDownloadError(name, error);
       }
       const got = await sha256(subtle, bytes);

@@ -54,6 +54,16 @@ def test_returns_at_most_max_faces() -> None:
     assert len(YuNetDetector(MODEL, max_faces=10).detect(grid)) >= 3
 
 
+def test_default_does_not_cap_the_number_of_faces(detector: YuNetDetector) -> None:
+    face = Image.open(FACE).convert("RGB")
+    n = 4
+    grid = Image.new("RGB", (n * face.width, n * face.height))
+    for i in range(n):
+        for j in range(n):
+            grid.paste(face, (i * face.width, j * face.height))
+    assert len(detector.detect(grid)) > 10
+
+
 def test_concurrent_calls_do_not_corrupt(detector: YuNetDetector) -> None:
     img = Image.open(FACE).convert("RGB")
     with ThreadPoolExecutor(4) as pool:
