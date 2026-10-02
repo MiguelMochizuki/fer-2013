@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import hashlib
 import json
 import math
@@ -243,18 +244,27 @@ def build_detector() -> dict[str, Any]:
     return {"fixtures": out}
 
 
+@functools.cache
+def detected_faces(name: str) -> list[tuple[Any, Image.Image]]:
+    """(clamped int box, gray crop) per face the Python pipeline finds in a fixture."""
+    detector = YuNetDetector(MODELS_DIR / "face_detection_yunet_2023mar.onnx")
+    img = Image.open(FIXTURES_DIR / name).convert("RGB")
+    faces = []
+    for raw in detector.detect(img):
+        box = _clamp(raw, img.width, img.height)
+        gray = crop_gray(img, box) if box is not None else None
+        if box is not None and gray is not None:
+            faces.append((box, gray))
+    return faces
+
+
 def build_preprocess() -> dict[str, Any]:
     """Per detected face: the clamped box, the gray crop, the 48x48 face and the 224x224 plane."""
-    detector = YuNetDetector(MODELS_DIR / "face_detection_yunet_2023mar.onnx")
     out: dict[str, Any] = {}
     for name in FIXTURE_NAMES:
         img = Image.open(FIXTURES_DIR / name).convert("RGB")
         faces = []
-        for raw in detector.detect(img):
-            box = _clamp(raw, img.width, img.height)
-            gray = crop_gray(img, box) if box is not None else None
-            if box is None or gray is None:
-                continue
+        for box, gray in detected_faces(name):
             face48 = (
                 gray
                 if gray.size == (48, 48)
@@ -286,6 +296,26 @@ def build_preprocess() -> dict[str, Any]:
     return {"fixtures": out}
 
 
+def build_classifier() -> dict[str, Any]:
+    """Python probabilities per detected face, and the layer4 features of the first face."""
+    clf = Classifier(MODELS_DIR / "fer_resnet18.onnx", MODELS_DIR / "fer_fc_weight.npy")
+    out: dict[str, Any] = {}
+    features_b64 = ""
+    for name in FIXTURE_NAMES:
+        faces = []
+        for _box, gray in detected_faces(name):
+            probs, features = clf.predict(to_input(gray))
+            faces.append({"probs": [float(p) for p in probs[0]]})
+            if not features_b64:
+                features_b64 = _b64(features[0].astype(np.float32))
+        out[name] = {"faces": faces}
+    return {
+        "fixtures": out,
+        "features_fixture": FIXTURE_NAMES[0],
+        "features_b64": features_b64,
+    }
+
+
 def build_golden() -> dict[str, Any]:
     """Section name -> JSON-serializable content. Binary data goes in `*_b64` fields."""
     return {
@@ -293,6 +323,7 @@ def build_golden() -> dict[str, Any]:
         "resample": build_resample(),
         "detector": build_detector(),
         "preprocess": build_preprocess(),
+        "classifier": build_classifier(),
     }
 
 
