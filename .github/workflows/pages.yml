@@ -33,7 +33,7 @@ jobs:
       - name: Fetch the models (sha256 checked)
         run: |
           RELEASE_URL=$(sed -n 's/^ARG RELEASE_URL=//p' Dockerfile)
-          WEB=1 RELEASE_URL="$RELEASE_URL" scripts/fetch_models.sh models serving/models.sha256
+          RELEASE_URL="$RELEASE_URL" scripts/fetch_models.sh models serving/models.sha256
       - run: npm test --prefix web
       - run: node web/build.mjs --models models --out web/dist
       - uses: actions/configure-pages@v6

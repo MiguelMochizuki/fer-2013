@@ -210,7 +210,7 @@ def cv_detect_floats(image: Image.Image) -> list[dict[str, float]]:
 
     Same rules: longest side capped at 640 with a bilinear resize, OpenCV
     `FaceDetectorYN` (2023mar model, score 0.6, NMS 0.3), boxes mapped back to
-    the original size, sorted by score, at most 10.
+    the original size, sorted by score.
     """
     rgb = image.convert("RGB")
     scale = min(1.0, 640 / max(rgb.size))
@@ -236,7 +236,7 @@ def cv_detect_floats(image: Image.Image) -> list[dict[str, float]]:
         for f in faces
     ]
     boxes.sort(key=lambda b: b["score"], reverse=True)
-    return boxes[:10]
+    return boxes
 
 
 def build_detector() -> dict[str, Any]:
@@ -250,7 +250,7 @@ def build_detector() -> dict[str, Any]:
 @functools.cache
 def detected_faces(name: str) -> list[tuple[Any, Image.Image]]:
     """(clamped int box, gray crop) per face the Python pipeline finds in a fixture."""
-    detector = YuNetDetector(MODELS_DIR / "face_detection_yunet_2023mar.onnx")
+    detector = YuNetDetector(MODELS_DIR / "face_detection_yunet_2026may.onnx")
     img = Image.open(FIXTURES_DIR / name).convert("RGB")
     faces = []
     for raw in detector.detect(img):
