@@ -21,6 +21,7 @@ export const S = {
   formats: "JPEG, PNG or WebP, up to 10\u00a0MB.",
   privacy: "The photo never leaves your device.",
   loadingModel: (loaded, total) => `Downloading the model, ${formatBytes(loaded)} of ${formatBytes(total)}`,
+  busy: "Still working on the previous photo.",
   detecting: "Looking for faces",
   result: (n, ms) => (n === 1 ? `1 face found in ${Math.round(ms)} ms.` : `${n} faces found in ${Math.round(ms)} ms.`),
   stripAria: "Pick a face",

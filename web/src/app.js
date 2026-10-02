@@ -263,14 +263,18 @@ function renderResult(result) {
 
 // ---- the main flow ----
 async function run(blob) {
-  if (busy || !blob) return;
+  if (!blob) return;
+  if (busy) {
+    setStatus(S.busy);
+    return;
+  }
   setBusy(true);
   lastBlob = blob;
   clearResults();
+  let bitmap = null;
   try {
     const first = validateFile(blob);
     if (!first.ok) throw { code: first.code };
-    let bitmap;
     try {
       bitmap = await createImageBitmap(blob, { imageOrientation: "from-image", colorSpaceConversion: "none", premultiplyAlpha: "none" });
     } catch {
@@ -294,10 +298,12 @@ async function run(blob) {
     setStatus(S.detecting);
     resultDeferred = deferred();
     worker.postMessage({ type: "analyze", bitmap, explain: true }, [bitmap]);
+    bitmap = null; // transferred: the worker closes it
     const result = await resultDeferred.promise;
     await renderResult(result);
     setState("result");
   } catch (error) {
+    bitmap?.close(); // never reached the worker (download failed, say): free the pixels
     els.progress.hidden = true;
     setState("error");
     showError(error?.code ?? "inference");
