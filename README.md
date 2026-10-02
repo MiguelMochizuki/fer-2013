@@ -229,7 +229,7 @@ docker build -t fer-api .
 docker run --rm -p 7860:7860 fer-api
 ```
 
-To publish a new model: run `scripts/calibrate.py` and the export with `--calibration`, `gh release create models-vX.Y.Z models/fer_resnet18.onnx models/fer_fc_weight.npy` (model releases use `models-v*` tags so they don't trigger the app's `v*` deploy; bump major when the serving contract changes, such as architecture, input normalization or labels, minor for a retrain, patch for a re-export), append their `sha256sum` lines to `serving/models.sha256`, and point `RELEASE_URL` in the `Dockerfile` at the new tag. CI tests, builds the image and smoke tests it. The image runs anywhere Docker does; the hosting target for the public demo is not decided yet.
+To publish a new model: run `scripts/calibrate.py` and the export with `--calibration`, `gh release create models-vX.Y.Z models/fer_resnet18.onnx models/fer_fc_weight.npy` (model releases use `models-v*` tags so they don't trigger the app's `v*` deploy; bump major when the serving contract changes, such as architecture, input normalization or labels, minor for a retrain, patch for a re-export), append their `sha256sum` lines to `serving/models.sha256`, and point `RELEASE_URL` in the `Dockerfile` at the new tag. CI tests, builds the image and smoke tests it. The image runs anywhere Docker does; the public demo is the [browser build](#browser-demo), which needs no server.
 
 ### Grad-CAM++ without PyTorch
 
@@ -253,9 +253,32 @@ Classifier alone, one 224x224 image, 2 threads: ONNX Runtime 15.6 ms p50 versus 
 ### Limitations and privacy
 
 - The classifier reaches about 71% accuracy on FER-2013 (see Results), its confidences are calibrated on that dataset's validation split only, and it inherits the dataset's biases: acted or web-scraped expressions, uneven demographics, noisy labels. Emotion labels from a face are not a reliable read of how someone feels. Do not use this for decisions about people.
+- The confidence moves with the crop: three copies of the same face in one image got 73.5%, 78.7% and 80.6% (the browser and Python agree on all three), because the detector boxes differ by a few pixels.
 - Faces from a detector are cropped square with a 10% margin before classification. On 1,476 FER test faces upscaled 4x (98% of 1,500 detected), classifying the detector crop scores 68.9% against 69.5% for the original 48x48 image on the same faces, and margins from 0% to 40% all land between 68.6% and 68.9%. So the crop costs about 0.6 points and the margin hardly matters. This is a proxy built from FER faces, not a benchmark on real photos.
 - Uploaded images are processed in memory and never written to disk or logged. Uploads are limited to 5 MB and JPEG, PNG or WebP.
 - The service is public and unauthenticated; it caps concurrent work and answers `503` when busy.
+
+## Browser demo
+
+`web/` is a static site that runs the same pipeline in the browser: YuNet finds the faces, the ONNX classifier predicts the emotion with the calibrated probabilities, and Grad-CAM++ is computed in JavaScript. The photo never leaves the page. After the models load there are no network requests (the Network tab shows it). A Content-Security-Policy restricts the page itself; the worker that processes the pixels is same-origin code with no network calls, but GitHub Pages cannot send CSP headers for workers, so the browser does not enforce that part.
+
+How it works:
+- Plain ES modules, no bundler. `onnxruntime-web` runs in a Web Worker with WebAssembly and one thread, because GitHub Pages cannot send the headers that threads need.
+- Every stage is tested in Node against golden files written by the Python pipeline (`scripts/make_web_golden.py`): resampling is byte-identical to Pillow, detector boxes match OpenCV (IoU at least 0.999), probabilities and Grad-CAM++ maps agree within 1e-4. A Python test fails when the golden files go stale, and the site build fails when the models differ from the ones the golden files were made for.
+- The models are downloaded on first use, checked against their sha256 and kept in the browser cache, so later visits do not download them again.
+- Measured in Chromium on a desktop, with one face: detection about 11 ms, classification about 100 ms, Grad-CAM++ about 4 ms; three faces take about 400 ms in total. A first visit downloads about 59 MB (the 45 MB model and the 14 MB runtime).
+- A JPEG decoded by Chromium gives probabilities that differ from Pillow's by 6e-8 on the example photo, and the same box. Other browsers may decode JPEG slightly differently.
+
+Build and run it locally:
+
+```bash
+cd web && npm ci && npm test && cd ..
+WEB=1 RELEASE_URL=<models release url> scripts/fetch_models.sh models serving/models.sha256
+node web/build.mjs --models models --out web/dist
+python3 -m http.server -d web/dist 8000
+```
+
+The site is published to GitHub Pages from `main` by `.github/workflows/pages.yml`. Pages is free for public repositories, with a soft limit of 100 GB of bandwidth per month, which is on the order of 1,500 first visits.
 
 ## Development
 

@@ -1,4 +1,4 @@
-name: Test, build and deploy
+name: Test and build
 
 on:
   push:
@@ -27,9 +27,33 @@ jobs:
         run: ONLY_YUNET=1 scripts/fetch_models.sh models serving/models.sha256
       - run: uv run pytest -q -m "not slow"
 
+  web:
+    name: Web demo tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: uv sync --frozen
+      - name: Fetch the models (classifier and both YuNet versions)
+        run: |
+          RELEASE_URL=$(sed -n 's/^ARG RELEASE_URL=//p' Dockerfile)
+          ONLY_YUNET=1 scripts/fetch_models.sh models serving/models.sha256
+          WEB=1 RELEASE_URL="$RELEASE_URL" scripts/fetch_models.sh models serving/models.sha256
+      - run: npm ci --prefix web
+      - run: npm test --prefix web
+      - name: Golden files are fresh
+        run: uv run pytest tests/web -q
+
   # Needs the models Release (tag models-v1.1.0) and a complete serving/models.sha256.
   # Enable it by setting the repository variable DOCKER_BUILD=true. While it is
-  # off, deploy is skipped too, so nothing ships without this smoke test.
+  # off, the release job is skipped too, so nothing ships without this smoke test.
   docker:
     name: Build and smoke test
     needs: test
@@ -49,52 +73,9 @@ jobs:
       - name: Smoke test
         run: scripts/smoke_test.sh fer-api:ci
 
-  deploy:
-    name: Deploy to Hugging Face Spaces
-    needs: docker
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-24.04
-    permissions:
-      id-token: write # lets the job request an OIDC token for the Trusted Publisher
-      contents: read
-    env:
-      HF_SPACE: ${{ vars.HF_SPACE }} # e.g. your-user/fer-2013
-    steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0
-      # No stored secret: the Space's Trusted Publisher (Settings > Trusted
-      # Publishers: this repo + ci.yml) exchanges the job's OIDC identity for a
-      # token that lasts 1 hour and can only write to this Space.
-      - name: Get a short-lived Hugging Face token
-        env:
-          HF_OIDC_RESOURCE: spaces/${{ vars.HF_SPACE }}
-        run: |
-          set -eu
-          token=$(uvx --from "huggingface_hub>=1.19.0" hf auth token)
-          echo "::add-mask::$token"
-          echo "HF_TOKEN=$token" >> "$GITHUB_ENV"
-      - name: Push the build context to the Space
-        run: |
-          set -eu
-          # Push only the build context: HF rejects binary files (docs images,
-          # test fixtures) not stored with LFS/Xet, and the Space doesn't need them.
-          mkdir space
-          cp -r Dockerfile .dockerignore pyproject.toml uv.lock LICENSE NOTICE src serving space/
-          mkdir space/scripts && cp scripts/fetch_models.sh space/scripts/
-          # Spaces need YAML front matter in README.md; the GitHub README has none.
-          printf -- '---\ntitle: FER-2013 Emotion API\nsdk: docker\napp_port: 7860\n---\n\n' \
-            | cat - README.md > space/README.md
-          cd space
-          git init -q -b main
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add -A
-          git commit -qm "Deploy ${GITHUB_REF_NAME}"
-          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" main
-
   release:
     name: Create GitHub Release
-    needs: deploy
+    needs: docker
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:

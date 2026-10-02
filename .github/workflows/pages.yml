@@ -1,0 +1,56 @@
+name: Deploy the browser demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "serving/models.sha256"
+      - "scripts/fetch_models.sh"
+      - "Dockerfile"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - name: Fetch the models (sha256 checked)
+        run: |
+          RELEASE_URL=$(sed -n 's/^ARG RELEASE_URL=//p' Dockerfile)
+          WEB=1 RELEASE_URL="$RELEASE_URL" scripts/fetch_models.sh models serving/models.sha256
+      - run: npm test --prefix web
+      - run: node web/build.mjs --models models --out web/dist
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: web/dist
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
