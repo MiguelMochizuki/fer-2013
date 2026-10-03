@@ -18,6 +18,7 @@ training:
   early_stopping_metric: macro_f1
   early_stopping_mode: max
   seed: 42
+  class_weights: true
 
 checkpoint:
   dir: checkpoints

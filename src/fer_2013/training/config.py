@@ -45,6 +45,7 @@ class TrainingConfig(_StrictBase):
     early_stopping_metric: Literal["macro_f1", "loss"] = "macro_f1"
     early_stopping_mode: Literal["max", "min"] = "max"
     seed: int = 42
+    class_weights: bool = True
 
     @field_validator("early_stopping_mode")
     @classmethod

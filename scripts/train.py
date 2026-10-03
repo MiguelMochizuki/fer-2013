@@ -118,7 +118,11 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     y_train = np.load(config.data.processed_dir / "y_train.npy")
-    class_weights = build_class_weights(y_train, n_classes=config.model.num_classes)
+    class_weights = (
+        build_class_weights(y_train, n_classes=config.model.num_classes)
+        if config.training.class_weights
+        else None
+    )
 
     model = build_resnet18(
         num_classes=config.model.num_classes,

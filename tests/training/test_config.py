@@ -133,3 +133,9 @@ def test_balanced_sampler_is_on_by_default_and_overridable() -> None:
         ).data.balanced_sampler
         is False
     )
+
+
+def test_class_weights_are_on_by_default_and_overridable() -> None:
+    assert Config().training.class_weights is True
+    cfg = Config.model_validate({"training": {"class_weights": False}})
+    assert cfg.training.class_weights is False
