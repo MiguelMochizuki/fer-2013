@@ -8,6 +8,9 @@ Usage:
     uv run python scripts/preprocess_data.py \\
         --csv-path data/raw/fer2013.csv \\
         --out-dir data/processed/ --force
+    uv run python scripts/preprocess_data.py \\
+        --csv-path data/raw/fer2013.csv --ferplus-csv data/raw/fer2013new.csv \\
+        --out-dir data/processed_ferplus/
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from fer_2013.data.preprocess import (
     MalformedRowError,
     PreprocessError,
     preprocess_fer2013,
+    preprocess_ferplus,
 )
 
 
@@ -39,6 +43,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         required=True,
         help="Directory where .npy files will be written (e.g. data/processed/).",
+    )
+    parser.add_argument(
+        "--ferplus-csv",
+        type=Path,
+        default=None,
+        help="fer2013new.csv (FER+ votes): write FER+ relabelled arrays instead.",
     )
     parser.add_argument(
         "--force",
@@ -72,7 +82,12 @@ def main(argv: list[str] | None = None) -> int:
     log = logging.getLogger("preprocess_data")
 
     try:
-        written = preprocess_fer2013(args.csv_path, args.out_dir, force=args.force)
+        if args.ferplus_csv is None:
+            written = preprocess_fer2013(args.csv_path, args.out_dir, force=args.force)
+        else:
+            written = preprocess_ferplus(
+                args.csv_path, args.ferplus_csv, args.out_dir, force=args.force
+            )
     except FileNotFoundError as exc:
         log.error("%s", exc)
         return 2

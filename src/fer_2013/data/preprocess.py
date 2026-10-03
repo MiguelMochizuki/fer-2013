@@ -35,6 +35,20 @@ EMOTION_LABELS: Final[tuple[str, ...]] = (
 )
 
 
+# FER+ vote columns in our label order; the other three (contempt, unknown, NF) only
+# decide whether a row is kept.
+FERPLUS_COLUMNS: Final[tuple[str, ...]] = (
+    "anger",
+    "disgust",
+    "fear",
+    "happiness",
+    "sadness",
+    "surprise",
+    "neutral",
+)
+_FERPLUS_DROPPED: Final[tuple[str, ...]] = ("contempt", "unknown", "NF")
+
+
 class PreprocessError(RuntimeError):
     """Base error for preprocessing."""
 
@@ -129,12 +143,74 @@ def preprocess_fer2013(
     return written
 
 
+def preprocess_ferplus(
+    csv_path: Path,
+    ferplus_csv_path: Path,
+    out_dir: Path,
+    *,
+    force: bool = False,
+) -> dict[str, Path]:
+    """Write FER-2013 arrays relabelled with the FER+ crowd votes.
+
+    The FER+ rows are aligned one to one with fer2013.csv. Rows whose majority vote
+    is contempt, unknown or not-a-face are dropped. Besides the usual
+    `X_<split>.npy` and `y_<split>.npy` (the argmax of the votes), each split gets
+    `y_<split>_soft.npy`: (N, 7) float32 vote fractions in `EMOTION_LABELS` order.
+
+    Args:
+        csv_path: path to fer2013.csv.
+        ferplus_csv_path: path to fer2013new.csv from github.com/microsoft/FERPlus.
+        out_dir: directory where the .npy files will be written.
+        force: if True, overwrite existing .npy files.
+
+    Returns:
+        Mapping of output filename to the written path.
+
+    Raises:
+        FileNotFoundError: one of the CSVs does not exist.
+        PreprocessError: the CSVs are not aligned or lack columns.
+    """
+    ferplus_csv_path = Path(ferplus_csv_path)
+    if not ferplus_csv_path.exists():
+        raise FileNotFoundError(f"CSV not found: {ferplus_csv_path}")
+    out_dir = Path(out_dir).expanduser().resolve()
+    names = [f"{kind}_{s}.npy" for s in SPLIT_MAP.values() for kind in ("X", "y")]
+    names += [f"y_{s}_soft.npy" for s in SPLIT_MAP.values()]
+    expected = [out_dir / n for n in names]
+    if all(p.exists() for p in expected) and not force:
+        return {p.name: p for p in expected}
+
+    fer = pd.read_csv(csv_path)
+    plus = pd.read_csv(ferplus_csv_path)
+    missing = {"Usage", *FERPLUS_COLUMNS, *_FERPLUS_DROPPED} - set(plus.columns)
+    if missing:
+        raise PreprocessError(f"FER+ CSV is missing columns: {sorted(missing)}")
+    if len(fer) != len(plus) or not (fer["Usage"] == plus["Usage"]).all():
+        raise PreprocessError("fer2013.csv and the FER+ CSV are not row-aligned.")
+
+    votes = plus[[*FERPLUS_COLUMNS, *_FERPLUS_DROPPED]].to_numpy(dtype=np.float64)
+    keep = votes.argmax(axis=1) < len(FERPLUS_COLUMNS)
+    soft = votes[:, : len(FERPLUS_COLUMNS)]
+    soft = (soft / soft.sum(axis=1, keepdims=True).clip(min=1)).astype(np.float32)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for usage, split in SPLIT_MAP.items():
+        rows = (fer["Usage"] == usage).to_numpy() & keep
+        X = _parse_pixels_column(fer.loc[rows, "pixels"])
+        np.save(out_dir / f"X_{split}.npy", X)
+        np.save(out_dir / f"y_{split}.npy", soft[rows].argmax(axis=1).astype(np.int64))
+        np.save(out_dir / f"y_{split}_soft.npy", soft[rows])
+    return {p.name: p for p in expected}
+
+
 __all__ = [
     "EMOTION_LABELS",
+    "FERPLUS_COLUMNS",
     "IMAGE_SHAPE",
     "PIXEL_COUNT",
     "SPLIT_MAP",
     "MalformedRowError",
     "PreprocessError",
     "preprocess_fer2013",
+    "preprocess_ferplus",
 ]

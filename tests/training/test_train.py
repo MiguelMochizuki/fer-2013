@@ -279,3 +279,12 @@ def test_fit_writes_tensorboard_logs(
     fit(model, train_loader, val_loader, config, reports_dir=tmp_path / "reports")
     assert (tmp_path / "runs").exists()
     assert any((tmp_path / "runs").rglob("events.out.tfevents.*"))
+
+
+def test_history_json_records_provenance(tmp_path: Path) -> None:
+    import json
+
+    from fer_2013.training.train import TrainHistory, save_history
+
+    path = save_history(TrainHistory(), tmp_path, {"git": "abc123", "config": {}})
+    assert json.loads(path.read_text())["provenance"]["git"] == "abc123"

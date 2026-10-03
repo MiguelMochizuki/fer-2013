@@ -85,6 +85,8 @@ def make_dataloader(
     Defaults:
         - balanced sampling on train, off elsewhere.
         - shuffle on train only when balanced=False.
+        - train uses the soft FER+ targets when `y_train_soft.npy` is there;
+          val and test always use hard labels.
     """
     if balanced is None:
         balanced = split == "train"
@@ -95,6 +97,7 @@ def make_dataloader(
         processed_dir,
         split=split,
         transform=build_transforms(split),
+        soft=split == "train" and (processed_dir / "y_train_soft.npy").exists(),
     )
 
     sampler: WeightedRandomSampler | None = None

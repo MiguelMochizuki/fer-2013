@@ -84,3 +84,16 @@ def test_transform_is_applied(processed_dir: Path) -> None:
     ds = FER2013Dataset(processed_dir, split="train", transform=transform)
     ds[0]
     assert len(calls) == 1
+
+
+def test_soft_dataset_returns_float_vote_targets(tmp_path: Path) -> None:
+
+    for split in ("train", "val", "test"):
+        np.save(tmp_path / f"X_{split}.npy", np.zeros((2, 48, 48), dtype=np.uint8))
+        np.save(tmp_path / f"y_{split}.npy", np.array([0, 1]))
+    soft = np.array([[1, 0, 0, 0, 0, 0, 0], [0, 0.5, 0, 0, 0, 0, 0.5]], np.float32)
+    np.save(tmp_path / "y_train_soft.npy", soft)
+
+    _, y = FER2013Dataset(tmp_path, split="train", soft=True)[1]
+    assert y.dtype == torch.float32
+    assert y.tolist() == [0, 0.5, 0, 0, 0, 0, 0.5]

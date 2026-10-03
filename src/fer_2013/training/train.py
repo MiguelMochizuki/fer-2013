@@ -6,8 +6,11 @@ Early stopping on validation macro-F1 (default) to counter class imbalance.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import random
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -90,11 +93,12 @@ def train_one_epoch(
 
         batch_size = x.size(0)
         running_loss += loss.item() * batch_size
-        running_correct += (logits.argmax(dim=1) == y).sum().item()
+        hard = y.argmax(dim=1) if y.ndim == 2 else y  # soft FER+ targets
+        running_correct += (logits.argmax(dim=1) == hard).sum().item()
         total += batch_size
 
         all_preds.append(logits.argmax(dim=1).detach().cpu().numpy())
-        all_targets.append(y.detach().cpu().numpy())
+        all_targets.append(hard.detach().cpu().numpy())
 
         if writer is not None:
             writer.add_scalar("batch/train_loss", loss.item(), global_step + batch_idx)
@@ -167,8 +171,30 @@ def save_checkpoint(
     )
 
 
-def save_history(history: TrainHistory, reports_dir: Path) -> Path:
-    """Dump the training history to a timestamped JSON file."""
+def _provenance(config: Config) -> dict[str, object]:
+    """What produced a run: config, git commit and a sha256 per data array."""
+    try:
+        git = subprocess.run(
+            ["git", "describe", "--always", "--dirty"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        git = None
+    data = {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted(config.data.processed_dir.glob("*.npy"))
+    }
+    return {"config": config.model_dump(mode="json"), "git": git, "data_sha256": data}
+
+
+def save_history(
+    history: TrainHistory,
+    reports_dir: Path,
+    provenance: dict[str, object] | None = None,
+) -> Path:
+    """Dump the training history, and optionally its provenance, to timestamped JSON."""
     reports_dir.mkdir(parents=True, exist_ok=True)
     path = reports_dir / f"history_{datetime.now():%Y%m%d_%H%M%S}.json"
     path.write_text(
@@ -182,6 +208,7 @@ def save_history(history: TrainHistory, reports_dir: Path) -> Path:
                 "val_f1": history.val_f1,
                 "best_epoch": history.best_epoch,
                 "best_val_score": history.best_val_score,
+                **({"provenance": provenance} if provenance else {}),
             },
             indent=2,
         )
@@ -207,7 +234,12 @@ def fit(
     """Run the training loop. Saves best + last checkpoints and history."""
     tcfg = config.training
     n_classes = config.model.num_classes
+    random.seed(tcfg.seed)
+    np.random.seed(tcfg.seed)
     torch.manual_seed(tcfg.seed)
+    # Same seed and hardware give the same run; other GPUs or drivers may still differ.
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     device = torch.device(config.device)
     model.to(device)
 
@@ -334,7 +366,7 @@ def fit(
         if writer is not None:
             writer.close()
 
-    history_path = save_history(history, reports_dir)
+    history_path = save_history(history, reports_dir, _provenance(config))
     log.info("history: %s", history_path)
 
     return history

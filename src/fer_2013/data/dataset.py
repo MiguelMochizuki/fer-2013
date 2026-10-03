@@ -27,6 +27,8 @@ class FER2013Dataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         processed_dir: directory containing X_<split>.npy and y_<split>.npy.
         split: one of "train", "val", "test".
         transform: optional callable applied to the image tensor.
+        soft: return the (7,) float vote fractions from `y_<split>_soft.npy`
+            (written by `preprocess_ferplus`) instead of the class index.
 
     Raises:
         FileNotFoundError: the split files are missing.
@@ -39,6 +41,7 @@ class FER2013Dataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         *,
         split: str = "train",
         transform: Transform | None = None,
+        soft: bool = False,
     ) -> None:
         if split not in SPLITS:
             raise ValueError(f"Unknown split: {split!r}. Expected one of {SPLITS}.")
@@ -48,7 +51,8 @@ class FER2013Dataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         self.transform = transform
 
         self._X = self._load("X", split)
-        self._y = self._load("y", split)
+        self._y = self._load("y_soft" if soft else "y", split)
+        self._soft = soft
 
         if len(self._X) != len(self._y):
             raise ValueError(
@@ -57,7 +61,9 @@ class FER2013Dataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
             )
 
     def _load(self, kind: str, split: str) -> np.ndarray:
-        path = self.processed_dir / f"{kind}_{split}.npy"
+        path = self.processed_dir / (
+            f"y_{split}_soft.npy" if kind == "y_soft" else f"{kind}_{split}.npy"
+        )
         if not path.exists():
             raise FileNotFoundError(f"Missing array: {path}")
         arr: np.ndarray = np.load(path)
@@ -71,7 +77,7 @@ class FER2013Dataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         y = self._y[idx]
 
         x_t = torch.from_numpy(x).float().unsqueeze(0) / 255.0
-        y_t = torch.tensor(y, dtype=torch.long)
+        y_t = torch.tensor(y, dtype=torch.float32 if self._soft else torch.long)
 
         if self.transform is not None:
             x_t = self.transform(x_t)
