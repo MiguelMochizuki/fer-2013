@@ -108,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         "train",
         batch_size=config.data.batch_size,
         num_workers=config.data.num_workers,
+        balanced=config.data.balanced_sampler,
     )
     val_loader = make_dataloader(
         config.data.processed_dir,

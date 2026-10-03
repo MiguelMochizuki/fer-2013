@@ -4,6 +4,7 @@ data:
   processed_dir: data/processed
   batch_size: 64
   num_workers: 4
+  balanced_sampler: true
 
 model:
   num_classes: 7

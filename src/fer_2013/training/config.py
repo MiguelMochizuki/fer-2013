@@ -25,6 +25,7 @@ class DataConfig(_StrictBase):
     processed_dir: Path = Path("data/processed")
     batch_size: int = Field(default=64, ge=1)
     num_workers: int = Field(default=4, ge=0)
+    balanced_sampler: bool = True
 
 
 class ModelConfig(_StrictBase):

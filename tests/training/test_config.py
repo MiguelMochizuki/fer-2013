@@ -123,3 +123,13 @@ def test_nested_config_accepts_sub_configs() -> None:
     assert cfg.model.num_classes == 3
     assert cfg.training.epochs == 2
     assert cfg.checkpoint.dir == Path("/tmp/ckpt")
+
+
+def test_balanced_sampler_is_on_by_default_and_overridable() -> None:
+    assert Config().data.balanced_sampler is True
+    assert (
+        Config.model_validate(
+            {"data": {"balanced_sampler": False}}
+        ).data.balanced_sampler
+        is False
+    )
