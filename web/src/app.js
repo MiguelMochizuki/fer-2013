@@ -282,12 +282,9 @@ function renderResult(result) {
     cell.append(h("dt", "", label), h("dd", "", value));
     els.timings.append(cell);
   }
-  const backend = h("div");
-  backend.append(h("dt", "", S.timings.runtime), h("dd", "", S.backend));
-  els.timings.append(backend);
   els.timings.hidden = false;
 
-  setStatus(result.faces.length === 0 ? `${S.noFace} ${S.noFaceTips}` : S.result(result.faces.length, t.total));
+  setStatus(result.faces.length === 0 ? `${S.noFace} ${S.noFaceTips}` : S.result(result.faces.length));
   return nextFrame().then(() => {
     els.boxes.classList.add("in");
     cards.forEach((c) => c.classList.add("in"));
