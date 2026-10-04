@@ -337,7 +337,7 @@ def fit(
 
             if config.checkpoint.save_last:
                 save_checkpoint(
-                    config.checkpoint.dir / "last.pt",
+                    config.checkpoint_dir / "last.pt",
                     model,
                     optimizer,
                     epoch,
@@ -353,7 +353,7 @@ def fit(
                 epochs_without_improvement = 0
                 if config.checkpoint.save_best:
                     save_checkpoint(
-                        config.checkpoint.dir / "best.pt",
+                        config.checkpoint_dir / "best.pt",
                         model,
                         optimizer,
                         epoch,

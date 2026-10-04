@@ -59,9 +59,13 @@ class TrainingConfig(_StrictBase):
 
 
 class CheckpointConfig(_StrictBase):
-    """Where checkpoints go and which ones to keep."""
+    """Where checkpoints go and which ones to keep.
 
-    dir: Path = Path("checkpoints")
+    ``dir`` defaults to ``checkpoints/<tensorboard.run_name>`` (see
+    `Config.checkpoint_dir`), so a run never overwrites another run's weights.
+    """
+
+    dir: Path | None = None
     save_best: bool = True
     save_last: bool = True
 
@@ -82,6 +86,11 @@ class Config(_StrictBase):
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
     tensorboard: TensorBoardConfig = Field(default_factory=TensorBoardConfig)
+
+    @property
+    def checkpoint_dir(self) -> Path:
+        """Explicit ``checkpoint.dir``, else ``checkpoints/<run_name>``."""
+        return self.checkpoint.dir or Path("checkpoints") / self.tensorboard.run_name
 
     @property
     def device(self) -> str:

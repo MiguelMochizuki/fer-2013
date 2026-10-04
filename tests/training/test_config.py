@@ -28,7 +28,7 @@ def test_default_config_has_sensible_values() -> None:
     assert cfg.training.epochs == 30
     assert cfg.training.early_stopping_metric == "macro_f1"
     assert cfg.training.early_stopping_mode == "max"
-    assert cfg.checkpoint.dir == Path("checkpoints")
+    assert cfg.checkpoint_dir == Path("checkpoints/fer2013_resnet18")
 
 
 def test_device_property_returns_string() -> None:
@@ -139,3 +139,10 @@ def test_class_weights_are_on_by_default_and_overridable() -> None:
     assert Config().training.class_weights is True
     cfg = Config.model_validate({"training": {"class_weights": False}})
     assert cfg.training.class_weights is False
+
+
+def test_checkpoint_dir_follows_run_name_unless_set() -> None:
+    cfg = Config.model_validate({"tensorboard": {"run_name": "exp1"}})
+    assert cfg.checkpoint_dir == Path("checkpoints/exp1")
+    cfg = Config.model_validate({"checkpoint": {"dir": "/tmp/ckpt"}})
+    assert cfg.checkpoint_dir == Path("/tmp/ckpt")
