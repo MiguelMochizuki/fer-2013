@@ -48,7 +48,8 @@ body.over::after { content: ""; position: fixed; inset: 12px; border: 2px dashed
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1240px; height: 64px; margin: 0 auto; padding: 0 24px; }
 .brand { font-weight: 700; font-stretch: 75%; font-size: 1.125rem; text-decoration: none; letter-spacing: -0.01em; }
 .links { display: flex; gap: 4px; }
-.link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 0.9375rem; transition: color 150ms ease; }
+.link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 0.9375rem; transition: color 150ms ease, transform 120ms var(--ease-out); }
+.link:active { transform: scale(0.97); }
 @media (hover: hover) and (pointer: fine) { .link:hover { color: var(--text); } }
 
 /* ---------- icons: masks, so they take currentColor ---------- */
@@ -160,6 +161,8 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
   line-height: 0.95;
 }
 .word.top { color: var(--text); }
+/* emotions under 1% share one muted line instead of a row of 0% */
+.word-quiet { flex-basis: 100%; margin-top: 0.5rem; font-size: 0.875rem; color: var(--muted); line-height: 1.4; }
 .word .pct { font-size: 0.8125rem; font-weight: 500; font-stretch: 100%; letter-spacing: 0; line-height: 1; color: var(--muted); }
 .word.top .pct { font-size: 1rem; font-weight: 600; color: var(--accent); }
 
@@ -167,6 +170,16 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 .view { margin: 0; }
 .view canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; background: var(--line); }
 .view figcaption { margin-top: 8px; font-size: 0.875rem; color: var(--muted); }
+
+/* while the model downloads or the photo is analyzed, the reading's place is held,
+   so the page does not jump when the answer arrives */
+.ghost { display: none; }
+#app:is([data-state="loading"], [data-state="analyzing"]) .ghost { display: block; padding: 4px 0 40px; }
+.ghost-word { width: 62%; height: clamp(2.75rem, 7vw, 5.5rem); background: var(--line); }
+.ghost-views { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+.ghost-views div { aspect-ratio: 1; background: var(--line); }
+.ghost-word, .ghost-views div { animation: hold 1.4s ease-in-out infinite alternate; }
+@keyframes hold { from { opacity: 0.45; } to { opacity: 1; } }
 
 /* timings: a line of numbers */
 .timings { display: flex; flex-wrap: wrap; gap: 4px 28px; margin: 0; padding-top: 16px; border-top: 1px solid var(--line); }
@@ -176,8 +189,17 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 
 .note { margin: 8px 0 0; max-width: 64ch; font-size: 0.875rem; color: var(--muted); }
 
+/* ---------- small screens: the two main actions share the row ---------- */
+@media (max-width: 599px) {
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .actions .btn { padding: 0 12px; min-width: 0; }
+  .actions .btn-quiet { grid-column: 1 / -1; justify-self: start; padding: 0 2px; }
+}
+
 /* ---------- reduced motion: no movement, only short fades ---------- */
 @media (prefers-reduced-motion: reduce) {
+  .ghost-word, .ghost-views div { animation: none; opacity: 0.7; }
+  .link:active { transform: none; }
   .photo, .face { transform: none; transition-property: opacity; transition-duration: 120ms; transition-delay: 0ms; }
   .btn:active, .pick:active, .plate:active .plate-box, .plate:hover .plate-box { transform: none; }
   .progress-fill { transition: none; }

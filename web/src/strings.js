@@ -33,6 +33,7 @@ export const S = {
   noFace: "No face found.",
   noFaceTips: "Try a sharper, front-facing photo with even light.",
   faceLabel: (i) => `Face ${i}`,
+  underOne: (labels) => `Under 1%: ${labels.join(", ")}`,
   original: "What the model saw",
   heatmap: "Where it looked",
   heatmapAlt: (i, emotion) => `Heatmap for face ${i}, predicted ${emotion}`,

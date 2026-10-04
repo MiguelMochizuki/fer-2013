@@ -206,12 +206,18 @@ function buildCard(face, i) {
   const faceTag = h("li", "face-tag", String(index));
   faceTag.setAttribute("aria-hidden", "true");
   words.append(faceTag);
+  const quiet = [];
   rankProbabilities(face.probabilities).forEach(({ label, p }, rank) => {
+    if (rank > 0 && Math.round(p * 100) < 1) {
+      quiet.push(S.emotions[label]); // one muted line instead of a row of 0%
+      return;
+    }
     const word = h("li", rank === 0 ? "word top" : "word");
     word.style.setProperty("--p", String(p));
     word.append(h("span", "", S.emotions[label]), h("span", "pct", `${Math.round(p * 100)}%`));
     words.append(word);
   });
+  if (quiet.length) words.append(h("li", "word-quiet", S.underOne(quiet)));
   card.append(words, views);
 
   return card;
@@ -223,12 +229,21 @@ function renderResult(result) {
   const cards = [];
   const boxes = [];
   const picks = [];
-  const select = (index) => {
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const select = (index, animate = true) => {
+    const changed = cards[index].hidden;
     cards.forEach((card, k) => {
       card.hidden = k !== index;
       boxes[k].classList.toggle("active", k === index);
       picks[k]?.setAttribute("aria-pressed", String(k === index));
     });
+    // a short rise on the face you picked, so the swap reads as one object changing
+    if (animate && changed) {
+      cards[index].animate(
+        [{ opacity: 0, transform: calm ? "none" : "translateY(6px)" }, { opacity: 1, transform: "none" }],
+        { duration: 160, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+      );
+    }
   };
   result.faces.forEach((face, i) => {
     const box = h("div", "box");
@@ -257,7 +272,7 @@ function renderResult(result) {
   });
   els.strip.hidden = !many;
   els.boxes.classList.toggle("multi", many);
-  select(0);
+  select(0, false);
   els.canvas.setAttribute("aria-label", S.stageLabel(result.faces.length));
 
   const t = result.timings;
