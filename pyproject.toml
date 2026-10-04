@@ -134,4 +134,4 @@ ignore_missing_imports = true
 # ==============================
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: needs checkpoints/best.pt"]
+markers = ["slow: needs checkpoints/ferplus/best.pt"]

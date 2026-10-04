@@ -7,7 +7,7 @@ writes `calibration.json` plus a reliability diagram. The JSON feeds
 `scripts/export_onnx.py --calibration`.
 
 Usage:
-    uv run python scripts/calibrate.py --checkpoint checkpoints/best.pt
+    uv run python scripts/calibrate.py --checkpoint checkpoints/ferplus/best.pt
 """
 
 from __future__ import annotations

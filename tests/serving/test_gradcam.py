@@ -15,7 +15,7 @@ from fer_2013.models.cnn import build_resnet18
 from fer_2013.serving.classifier import Classifier
 from fer_2013.serving.gradcam import gradcam_pp, overlay_png_b64
 
-CHECKPOINT = Path("checkpoints/best.pt")
+CHECKPOINT = Path("checkpoints/ferplus/best.pt")
 
 
 def test_zero_features_give_zero_map_no_nan() -> None:
@@ -64,7 +64,7 @@ def test_parity_with_pytorch_grad_cam(
 
 
 @pytest.mark.slow
-@pytest.mark.skipif(not CHECKPOINT.exists(), reason="needs checkpoints/best.pt")
+@pytest.mark.skipif(not CHECKPOINT.exists(), reason="needs checkpoints/ferplus/best.pt")
 def test_parity_on_trained_checkpoint(
     tmp_path: Path,
 ) -> None:
