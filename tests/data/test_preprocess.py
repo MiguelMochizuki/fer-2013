@@ -178,3 +178,63 @@ def test_constants() -> None:
         "surprise",
         "neutral",
     )
+
+
+# ==============================
+# preprocess_ferplus
+# ==============================
+
+_VOTE_COLS = [*pp.FERPLUS_COLUMNS, "contempt", "unknown", "NF"]
+
+
+def _make_ferplus_csv(tmp_path: Path, rows: list[tuple[str, list[int]]]) -> Path:
+    path = tmp_path / "fer2013new.csv"
+    df = pd.DataFrame([v for _, v in rows], columns=_VOTE_COLS)
+    df.insert(0, "Usage", [u for u, _ in rows])
+    df.to_csv(path, index=False)
+    return path
+
+
+def test_ferplus_soft_labels_follow_votes_and_drop_non_emotion_rows(
+    tmp_path: Path,
+) -> None:
+    csv = _make_csv(
+        tmp_path,
+        [
+            (0, _pixels(1), "Training"),
+            (0, _pixels(2), "Training"),
+            (0, _pixels(3), "Training"),
+            (0, _pixels(4), "PublicTest"),
+            (0, _pixels(5), "PrivateTest"),
+        ],
+    )
+    plus = _make_ferplus_csv(
+        tmp_path,
+        [
+            # anger fer order: anger disgust fear happy sad surprise neutral | contempt unknown NF
+            ("Training", [0, 0, 0, 6, 0, 0, 4, 0, 0, 0]),  # happy 0.6 / neutral 0.4
+            ("Training", [0, 0, 0, 0, 0, 0, 2, 0, 8, 0]),  # unknown wins -> dropped
+            ("Training", [0, 0, 0, 0, 0, 0, 3, 7, 0, 0]),  # contempt wins -> dropped
+            ("PublicTest", [9, 1, 0, 0, 0, 0, 0, 0, 0, 0]),
+            ("PrivateTest", [0, 0, 0, 0, 0, 10, 0, 0, 0, 0]),
+        ],
+    )
+    out = tmp_path / "plus"
+    pp.preprocess_ferplus(csv, plus, out)
+
+    soft = np.load(out / "y_train_soft.npy")
+    assert soft.shape == (1, 7) and soft.dtype == np.float32
+    np.testing.assert_allclose(soft[0], [0, 0, 0, 0.6, 0, 0, 0.4])
+    assert np.load(out / "y_train.npy").tolist() == [3]
+    assert np.load(out / "X_train.npy")[0, 0, 0] == 1
+    assert np.load(out / "y_val.npy").tolist() == [0]
+    assert np.load(out / "y_test.npy").tolist() == [5]
+
+
+def test_ferplus_rejects_misaligned_csvs(tmp_path: Path) -> None:
+    csv = _make_csv(tmp_path, [(0, _pixels(1), "Training")])
+    plus = _make_ferplus_csv(
+        tmp_path, [("PublicTest", [10, 0, 0, 0, 0, 0, 0, 0, 0, 0])]
+    )
+    with pytest.raises(pp.PreprocessError, match="aligned"):
+        pp.preprocess_ferplus(csv, plus, tmp_path / "plus")

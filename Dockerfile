@@ -12,7 +12,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --only-group serve --no-install-project \
     && find .venv -type d \( -name tests -o -name test \) -prune -exec rm -rf {} +
 
-ARG RELEASE_URL=https://github.com/MiguelMochizuki/fer-2013/releases/download/models-v1.2.0
+ARG RELEASE_URL=https://github.com/MiguelMochizuki/fer-2013/releases/download/models-v1.3.0
 ARG SHA_FILE=serving/models.sha256
 COPY scripts/fetch_models.sh /usr/local/bin/fetch_models.sh
 COPY ${SHA_FILE} /tmp/models.sha256

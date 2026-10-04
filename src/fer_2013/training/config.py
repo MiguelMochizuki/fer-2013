@@ -25,6 +25,7 @@ class DataConfig(_StrictBase):
     processed_dir: Path = Path("data/processed")
     batch_size: int = Field(default=64, ge=1)
     num_workers: int = Field(default=4, ge=0)
+    balanced_sampler: bool = True
 
 
 class ModelConfig(_StrictBase):
@@ -44,6 +45,7 @@ class TrainingConfig(_StrictBase):
     early_stopping_metric: Literal["macro_f1", "loss"] = "macro_f1"
     early_stopping_mode: Literal["max", "min"] = "max"
     seed: int = 42
+    class_weights: bool = True
 
     @field_validator("early_stopping_mode")
     @classmethod
@@ -57,9 +59,13 @@ class TrainingConfig(_StrictBase):
 
 
 class CheckpointConfig(_StrictBase):
-    """Where checkpoints go and which ones to keep."""
+    """Where checkpoints go and which ones to keep.
 
-    dir: Path = Path("checkpoints")
+    ``dir`` defaults to ``checkpoints/<tensorboard.run_name>`` (see
+    `Config.checkpoint_dir`), so a run never overwrites another run's weights.
+    """
+
+    dir: Path | None = None
     save_best: bool = True
     save_last: bool = True
 
@@ -80,6 +86,11 @@ class Config(_StrictBase):
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
     tensorboard: TensorBoardConfig = Field(default_factory=TensorBoardConfig)
+
+    @property
+    def checkpoint_dir(self) -> Path:
+        """Explicit ``checkpoint.dir``, else ``checkpoints/<run_name>``."""
+        return self.checkpoint.dir or Path("checkpoints") / self.tensorboard.run_name
 
     @property
     def device(self) -> str:

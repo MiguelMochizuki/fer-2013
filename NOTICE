@@ -6,6 +6,13 @@ FER-2013 dataset
   the Kaggle mirror deadskull7/fer2013 (listed there as CC0). The dataset is
   not redistributed in this repository.
 
+FER+ labels
+  Barsoum, Zhang, Canton Ferrer and Zhang, "Training Deep Networks for Facial
+  Expression Recognition with Crowd-Sourced Label Distribution", ACM ICMI 2016.
+  fer2013new.csv from https://github.com/microsoft/FERPlus, Copyright (c)
+  Microsoft Corporation, MIT License. The shipped model is trained on these
+  labels. The CSV is not redistributed in this repository.
+
 YuNet face detector (face_detection_yunet_2026may.onnx)
   From the OpenCV Zoo, https://github.com/opencv/opencv_zoo, MIT License.
   Downloaded at build time; not stored in this repository. The 2023mar file is

@@ -19,7 +19,7 @@ import numpy as np
 from fer_2013.data.datamodule import build_class_weights, make_dataloader
 from fer_2013.models.cnn import build_resnet18
 from fer_2013.training.config import Config, load_config
-from fer_2013.training.train import fit
+from fer_2013.training.train import fit, seed_everything
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -102,12 +102,14 @@ def main(argv: list[str] | None = None) -> int:
     config = _load_with_overrides(args.config, args.set)
     log.info("device: %s", config.device)
     log.info("config: %s", config.model_dump())
+    seed_everything(config.training.seed)
 
     train_loader = make_dataloader(
         config.data.processed_dir,
         "train",
         batch_size=config.data.batch_size,
         num_workers=config.data.num_workers,
+        balanced=config.data.balanced_sampler,
     )
     val_loader = make_dataloader(
         config.data.processed_dir,
@@ -117,7 +119,11 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     y_train = np.load(config.data.processed_dir / "y_train.npy")
-    class_weights = build_class_weights(y_train, n_classes=config.model.num_classes)
+    class_weights = (
+        build_class_weights(y_train, n_classes=config.model.num_classes)
+        if config.training.class_weights
+        else None
+    )
 
     model = build_resnet18(
         num_classes=config.model.num_classes,

@@ -7,7 +7,7 @@ import { formatBytes } from "./view.js";
 export const S = {
   brand: "fer-2013",
   title: "Facial expression classifier",
-  lede: "A ResNet18 trained on FER-2013. It finds the faces in your photo, picks one of seven expressions for each, and shows where it looked. Everything runs in this tab.",
+  lede: "A ResNet18 trained on FER+, crowd-labelled FER-2013 faces. It finds the faces in your photo, picks one of seven expressions for each, and shows where it looked. Everything runs in this tab.",
   navCode: "Code",
   navApi: "API",
   navLabel: "Project links",
@@ -39,7 +39,7 @@ export const S = {
   stageLabel: (n) => (n === 0 ? "Uploaded photo, no faces found" : n === 1 ? "Uploaded photo with 1 face marked" : `Uploaded photo with ${n} faces marked`),
   timings: { detect: "Detection", classify: "Classification", gradcam: "Grad-CAM++", runtime: "Runtime" },
   backend: "WebAssembly, 1 thread",
-  limitation: "Expression labels read off a face are unreliable. This model gets about 71% right on FER-2013.",
+  limitation: "Expression labels read off a face are unreliable. This model gets about 86% right on the FER+ test set, and is weakest on disgust and fear.",
   limitationLink: "Limitations",
   retry: "Try again",
   emotions: { angry: "angry", disgust: "disgust", fear: "fear", happy: "happy", sad: "sad", surprise: "surprise", neutral: "neutral" },
