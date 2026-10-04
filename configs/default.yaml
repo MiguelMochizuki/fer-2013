@@ -1,10 +1,13 @@
-# Training configuration for FER-2013 ResNet18.
+# Training configuration for the shipped model (models-v1.3.0): ResNet18 on the FER+
+# labels, plain cross-entropy on the vote distribution, early stopping on validation
+# loss. Class weights and the balanced sampler are off on purpose: with them the model
+# over-predicted disgust and lost 12 to 15 points of accuracy (docs/results.md).
 
 data:
-  processed_dir: data/processed
+  processed_dir: data/processed_ferplus
   batch_size: 64
   num_workers: 4
-  balanced_sampler: true
+  balanced_sampler: false
 
 model:
   num_classes: 7
@@ -15,10 +18,10 @@ training:
   lr: 1.0e-4
   weight_decay: 1.0e-4
   early_stopping_patience: 5
-  early_stopping_metric: macro_f1
-  early_stopping_mode: max
+  early_stopping_metric: loss
+  early_stopping_mode: min
   seed: 42
-  class_weights: true
+  class_weights: false
 
 checkpoint:
   save_best: true
@@ -27,4 +30,4 @@ checkpoint:
 tensorboard:
   enabled: true
   log_dir: runs
-  run_name: fer2013_resnet18
+  run_name: ferplus
