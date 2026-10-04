@@ -249,6 +249,7 @@ def fit(
     tcfg = config.training
     n_classes = config.model.num_classes
     seed_everything(tcfg.seed)
+    provenance = _provenance(config)  # at the start: the tree may change during a run
     device = torch.device(config.device)
     model.to(device)
 
@@ -375,7 +376,7 @@ def fit(
         if writer is not None:
             writer.close()
 
-    history_path = save_history(history, reports_dir, _provenance(config))
+    history_path = save_history(history, reports_dir, provenance)
     log.info("history: %s", history_path)
 
     return history
