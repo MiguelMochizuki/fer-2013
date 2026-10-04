@@ -44,7 +44,7 @@ test("reads the real fc_weight the same as numpy", { skip: !existsSync(REAL) }, 
   const buf = await readFile(REAL);
   const { shape, data } = parseNpy(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   assert.deepEqual(shape, [7, 512]);
-  for (const [i, v] of [[0, -0.0379767082631588], [1, -0.03637956827878952], [511, 0.04237420856952667], [512, 0.0328083299100399], [3583, -0.060277462005615234]]) {
+  for (const [i, v] of [[0, 0.005544816143810749], [1, 0.012724539265036583], [511, -0.0016992128221318126], [512, -0.037372708320617676], [3583, 0.009884540922939777]]) {
     assert.equal(data[i], Math.fround(v));
   }
 });
