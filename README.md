@@ -4,7 +4,7 @@ A ResNet18 that reads seven facial expressions, trained, calibrated, shrunk to 1
 
 **[Live demo](https://miguelmochizuki.github.io/fer-2013/)** · [API](#api) · [Results](#results) · [Limitations](#limitations-and-privacy)
 
-![The demo: a photo with the detected face, the emotion typeset by probability, the crop and the Grad-CAM++ heatmap](docs/images/demo.png)
+![The live demo, step by step: the sample photo is analyzed and read as happy with its crop and Grad-CAM++ heatmap, then a photo with four faces is analyzed and face 3 is selected](docs/images/demo.gif)
 
 ## Highlights
 
