@@ -19,6 +19,8 @@
   --accent-ink: #ffffff;
   --danger: #b42318;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* spacing: one 8px scale; the 24px step is both the grid gutter and the outer margin */
+  --s1: 8px; --s2: 16px; --s3: 24px; --s4: 32px; --s6: 48px;
   --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light dark;
 }
@@ -48,7 +50,8 @@ body.over::after { content: ""; position: fixed; inset: 12px; border: 2px dashed
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1240px; height: 64px; margin: 0 auto; padding: 0 24px; }
 .brand { font-weight: 700; font-stretch: 75%; font-size: 1.125rem; text-decoration: none; letter-spacing: -0.01em; }
 .links { display: flex; gap: 4px; }
-.link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 0.9375rem; transition: color 150ms ease; }
+.link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 0.9375rem; transition: color 150ms ease, transform 120ms var(--ease-out); }
+.link:active { transform: scale(0.97); }
 @media (hover: hover) and (pointer: fine) { .link:hover { color: var(--text); } }
 
 /* ---------- icons: masks, so they take currentColor ---------- */
@@ -56,28 +59,38 @@ body.over::after { content: ""; position: fixed; inset: 12px; border: 2px dashed
 .icon-github { --icon: url("../icons/github-logo.svg"); }
 .icon-warning { --icon: url("../icons/warning-circle.svg"); color: var(--danger); }
 
-/* ---------- layout: the photo keeps its place from the first screen to the result ---------- */
-main { max-width: 1240px; margin: 0 auto; padding: 0 24px 56px; display: grid; gap: 32px 56px; grid-template-columns: minmax(0, 1fr); }
+/* ---------- layout: a 12-column grid, 24px gutter equal to the outer margin ---------- */
+/* Two equal halves (photo | reading), and the reading is three equal thirds (crop | heatmap |
+   timings), so every edge lands on a column line. The photo keeps its place from the first
+   screen to the result. Below 900px it is one column. */
+main { max-width: 1240px; margin: 0 auto; padding: 0 var(--s3) var(--s6); display: grid; gap: var(--s4) var(--s3); grid-template-columns: minmax(0, 1fr); }
 .intro, .stage, .results { min-width: 0; }
 @media (min-width: 900px) {
-  main { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); grid-template-areas: "stage intro" "note note"; align-items: center; padding-top: 16px; }
-  .intro { grid-area: intro; }
-  .stage { grid-area: stage; }
+  main { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--s3); align-items: start; padding-top: var(--s3); }
+  .stage { grid-column: 1 / span 6; grid-row: 1; }
+  .intro { grid-column: 7 / span 6; grid-row: 1; align-self: center; }
   .results { display: none; }
-  .note { grid-area: note; }
-  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) {
-    grid-template-areas: "intro intro" "stage results" "note note"; align-items: start; gap: 16px 56px; padding-top: 0;
-  }
-  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .results { display: block; grid-area: results; }
-  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .stage { position: sticky; top: 16px; }
+  .note { grid-column: 1 / -1; grid-row: 2; margin: 0; }
+  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .intro { grid-column: 1 / -1; align-self: start; }
+  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .stage { grid-row: 2; position: sticky; top: var(--s3); }
+  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .results { display: grid; grid-column: 7 / span 6; grid-row: 2; grid-template-columns: subgrid; row-gap: var(--s3); align-content: start; align-items: end; }
+  #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .note { grid-row: 3; }
+  .results :is(.strip, .words, .ghost) { grid-column: 1 / -1; }
+  .results :is(.faces, .face, .views) { display: contents; }
+  .results .strip { margin: 0; }
+  .results .view { grid-column: span 2; }
+  .results .timings { grid-column: span 2; flex-direction: column; gap: var(--s1); border-top: 0; padding: 0 0 calc(0.875rem * 1.5 + var(--s1)); }
+  .results .timings div { flex-direction: column; gap: 0; }
+  .results .timings dd { font-size: 1.0625rem; }
+  .results .words { --r: clamp(2.75rem, 5.2vw, 5rem); }
 }
 
-h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98; letter-spacing: -0.035em; font-weight: 700; font-stretch: 80%; text-wrap: balance; }
-.lede { margin: 0 0 28px; color: var(--muted); max-width: 38ch; font-size: 1.125rem; text-wrap: pretty; }
+h1 { margin: 0 0 var(--s3); font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98; letter-spacing: -0.035em; font-weight: 700; font-stretch: 80%; text-wrap: balance; }
+.lede { margin: 0 0 var(--s3); color: var(--muted); max-width: 38ch; font-size: 1.125rem; text-wrap: pretty; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; }
-.hint { margin: 20px 0 0; font-size: 0.875rem; color: var(--muted); max-width: 46ch; }
-.actions + .hint { margin-top: 28px; }
-.hint + .hint { margin-top: 4px; }
+.hint { margin: var(--s2) 0 0; font-size: 0.875rem; color: var(--muted); max-width: 46ch; }
+.actions + .hint { margin-top: var(--s3); }
+.hint + .hint { margin-top: var(--s1); }
 
 /* once a photo is in, the intro collapses to a single row of controls */
 #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) :is(h1, .lede, .hint) { display: none; }
@@ -101,7 +114,7 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 .plate { position: relative; display: block; width: 100%; max-width: 640px; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
 .plate img { display: block; width: 100%; height: auto; }
 .plate-box { position: absolute; left: 30%; top: 25%; width: 34.5%; height: 42.5%; border: 2px solid var(--accent); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.55); transition: transform 200ms var(--ease-out); }
-.plate-cap { display: block; margin-top: 10px; font-size: 0.875rem; color: var(--muted); }
+.plate-cap { display: block; margin-top: var(--s1); font-size: 0.875rem; color: var(--muted); }
 @media (hover: hover) and (pointer: fine) { .plate:hover .plate-box { transform: scale(1.04); } }
 .plate:active .plate-box { transform: scale(0.98); }
 #app:not([data-state="idle"], [data-state="error"]) .plate { display: none; }
@@ -123,14 +136,14 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 .pick.stale { opacity: 0.4; }
 
 /* ---------- progress / status / error ---------- */
-.progress { height: 2px; margin-top: 12px; overflow: hidden; }
+.progress { height: 2px; margin-top: var(--s2); overflow: hidden; }
 .progress-fill { height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); transition: transform 120ms linear; }
-.status { min-height: 1.5em; margin: 12px 0 0; color: var(--muted); font-size: 0.9375rem; }
-.error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 0; border-block: 1px solid var(--danger); }
+.status { min-height: 1.5em; margin: var(--s2) 0 0; color: var(--muted); font-size: 0.9375rem; }
+.error { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s2); padding: var(--s2) 0; border-block: 1px solid var(--danger); }
 .error p { margin: 0; flex: 1 1 220px; }
 
 /* face picker: shown only when there is more than one face */
-.strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.strip { display: flex; flex-wrap: wrap; gap: var(--s1); margin-bottom: var(--s3); }
 .pick { position: relative; width: 56px; height: 56px; padding: 0; border: 2px solid transparent; background: var(--line); cursor: pointer; transition: border-color 150ms ease, transform 120ms var(--ease-out); }
 .pick:active { transform: scale(0.96); }
 .pick canvas { display: block; width: 100%; height: 100%; }
@@ -141,12 +154,12 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
 /* ---------- the reading: emotions typeset by probability ---------- */
 .faces { list-style: none; margin: 0; padding: 0; }
 .face {
-  position: relative; padding: 4px 0 40px;
+  position: relative; padding: 0 0 var(--s6);
   opacity: 0; transform: translateY(8px);
   transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out);
   transition-delay: calc(var(--i, 0) * 60ms);
 }
-.face + .face { padding-top: 32px; border-top: 1px solid var(--line); }
+.face + .face { padding-top: var(--s4); border-top: 1px solid var(--line); }
 .face.in { opacity: 1; transform: none; }
 
 .words { --r: clamp(2.75rem, 8vw, 6.5rem); list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1em 0.7em; font-size: 1rem; }
@@ -160,24 +173,46 @@ h1 { margin: 0 0 20px; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 0.98
   line-height: 0.95;
 }
 .word.top { color: var(--text); }
+/* emotions under 1% share one muted line instead of a row of 0% */
+.word-quiet { flex-basis: 100%; margin-top: 0.5rem; font-size: 0.875rem; color: var(--muted); line-height: 1.4; }
 .word .pct { font-size: 0.8125rem; font-weight: 500; font-stretch: 100%; letter-spacing: 0; line-height: 1; color: var(--muted); }
 .word.top .pct { font-size: 1rem; font-weight: 600; color: var(--accent); }
 
-.views { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+.views { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s3); }
 .view { margin: 0; }
 .view canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; background: var(--line); }
-.view figcaption { margin-top: 8px; font-size: 0.875rem; color: var(--muted); }
+.view figcaption { margin-top: var(--s1); font-size: 0.875rem; color: var(--muted); }
+
+/* while the model downloads or the photo is analyzed, the reading's place is held,
+   so the page does not jump when the answer arrives */
+.ghost { display: none; }
+#app:is([data-state="loading"], [data-state="analyzing"]) .ghost { display: block; padding: 0 0 var(--s6); }
+.ghost-word { width: 62%; height: clamp(2.75rem, 7vw, 5.5rem); background: var(--line); }
+.ghost-views { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s3); }
+@media (min-width: 900px) { .ghost, #app:is([data-state="loading"], [data-state="analyzing"]) .ghost { padding: 0; } .ghost-views { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); } }
+.ghost-views div { aspect-ratio: 1; background: var(--line); }
+.ghost-word, .ghost-views div { animation: hold 1.4s ease-in-out infinite alternate; }
+@keyframes hold { from { opacity: 0.45; } to { opacity: 1; } }
 
 /* timings: a line of numbers */
-.timings { display: flex; flex-wrap: wrap; gap: 4px 28px; margin: 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.timings { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); margin: 0; padding-top: var(--s2); border-top: 1px solid var(--line); }
 .timings div { display: flex; gap: 8px; align-items: baseline; }
 .timings dt { font-size: 0.875rem; color: var(--muted); }
 .timings dd { margin: 0; font-size: 0.9375rem; font-weight: 600; }
 
-.note { margin: 8px 0 0; max-width: 64ch; font-size: 0.875rem; color: var(--muted); }
+.note { margin: var(--s1) 0 0; max-width: 64ch; font-size: 0.875rem; color: var(--muted); }
+
+/* ---------- small screens: the two main actions share the row ---------- */
+@media (max-width: 599px) {
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .actions .btn { padding: 0 12px; min-width: 0; }
+  .actions .btn-quiet { grid-column: 1 / -1; justify-self: start; padding: 0 2px; }
+}
 
 /* ---------- reduced motion: no movement, only short fades ---------- */
 @media (prefers-reduced-motion: reduce) {
+  .ghost-word, .ghost-views div { animation: none; opacity: 0.7; }
+  .link:active { transform: none; }
   .photo, .face { transform: none; transition-property: opacity; transition-duration: 120ms; transition-delay: 0ms; }
   .btn:active, .pick:active, .plate:active .plate-box, .plate:hover .plate-box { transform: none; }
   .progress-fill { transition: none; }
