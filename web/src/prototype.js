@@ -1,5 +1,5 @@
-// PROTOTYPE: switches the layout variant with ?variant=A|B|C|D|E, arrow keys or the bar. Throwaway.
-const NAMES = { A: "Split (current)", B: "Band", C: "Diptych", D: "Rail", E: "Compact readout" };
+// PROTOTYPE: switches the layout variant with ?variant=A|B|C|D|E|F, arrow keys or the bar. Throwaway.
+const NAMES = { A: "Split (current)", B: "Band", C: "Diptych", D: "Rail", E: "Compact readout", F: "Grid 6/6" };
 const KEYS = Object.keys(NAMES);
 const url = new URL(location.href);
 let current = KEYS.includes(url.searchParams.get("variant")) ? url.searchParams.get("variant") : "A";

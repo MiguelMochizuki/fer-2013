@@ -59,4 +59,24 @@
   html[data-variant="E"] .results .words { grid-column: 1 / -1; margin-bottom: 20px; }
   html[data-variant="E"] .results .views { display: contents; }
   html[data-variant="E"] .results .timings { grid-column: 3; flex-direction: column; border-top: 0; padding: 0 0 26px 12px; gap: 6px; }
+
+  /* ---------- F: a 12-column grid, 24px gutter equal to the outer margin. The page is two equal halves
+     (photo | reading) and the reading is three equal thirds (crop | heatmap | timings), so every edge
+     lands on a column line. The spacing between rows is one value (24px). ---------- */
+  html[data-variant="F"] #app { grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-areas: none; column-gap: 24px; row-gap: 24px; align-items: start; padding-top: 24px; }
+  html[data-variant="F"] #app .stage { grid-column: 1 / span 6; grid-row: 1; }
+  html[data-variant="F"] #app .intro { grid-column: 7 / span 6; grid-row: 1; align-self: center; }
+  html[data-variant="F"] #app .note { grid-column: 1 / -1; grid-row: 2; margin: 0; }
+  html[data-variant="F"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .intro { grid-column: 1 / -1; grid-row: 1; align-self: start; }
+  html[data-variant="F"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .stage { grid-row: 2; position: sticky; top: 24px; }
+  html[data-variant="F"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .results { display: grid; grid-column: 7 / span 6; grid-row: 2; grid-template-columns: subgrid; row-gap: 24px; align-content: start; align-items: end; }
+  html[data-variant="F"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .note { grid-row: 3; }
+  html[data-variant="F"] .results :is(.strip, .words, .ghost) { grid-column: 1 / -1; }
+  html[data-variant="F"] .results :is(.faces, .face, .views) { display: contents; }
+  html[data-variant="F"] .results .strip { margin: 0; }
+  html[data-variant="F"] .results .words { --r: clamp(2.75rem, 5.2vw, 5rem); }
+  html[data-variant="F"] .results .view { grid-column: span 2; }
+  html[data-variant="F"] .results .timings { grid-column: span 2; flex-direction: column; gap: 8px; border-top: 0; padding: 0 0 28px; }
+  html[data-variant="F"] .results .timings div { flex-direction: column; gap: 0; }
+  html[data-variant="F"] .results .timings dd { font-size: 1.0625rem; }
 }
