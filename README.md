@@ -130,7 +130,7 @@ Code is documented in Google-style docstrings (Python) and JSDoc (JavaScript); t
 ```bash
 uv run ruff check --fix . && uv run ruff format .   # lint and format
 uv run mypy                                         # strict type check
-uv run pytest -q                                    # python tests
+uv run pytest -q                                    # Python tests
 npm test --prefix web                               # site tests
 uv run pre-commit install                           # ruff + mypy on commit, tests on push
 ```
