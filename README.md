@@ -8,7 +8,7 @@ A ResNet18 that reads seven facial expressions, trained, calibrated, shrunk to 1
 
 ## Highlights
 
-| | |
+| Property | Evidence |
 |---|---|
 | **Nothing leaves the tab** | Face detection, classification and Grad-CAM++ run in WebAssembly. Photo or live camera, every face at once. First visit downloads 26 MB. |
 | **Accurate and honest** | 85.6% accuracy, 0.769 macro-F1 on the FER+ test set (the FER-2013 images with crowd-voted labels, [why](docs/results.md#why-fer)). Confidences are calibrated (ECE 0.092 to 0.021): when it says 90% or more, it is right 98% of the time. Rare classes (`disgust`, `fear`) are the weak spot and the results say so. |
@@ -32,7 +32,7 @@ uv sync
 
 ## How it works
 
-```
+```text
 photo or camera frame
   -> YuNet face detector (230 KB, ONNX)
   -> square crop with 10% margin, grayscale, 224x224
@@ -62,7 +62,7 @@ Override any config value with `--set section.field=value` (see `configs/default
 
 ## Results
 
-| | FER+ test accuracy | Macro-F1 | ECE | Size | One image |
+| Model | FER+ test accuracy | Macro-F1 | ECE | Size | One image |
 |---|---|---|---|---|---|
 | fp32 | 0.859 | 0.770 | 0.021 | 44.7 MB | 15.6 ms |
 | **int8 (shipped)** | **0.856** | **0.769** | **0.015** | **11.3 MB** | **5.3 ms** |
@@ -105,7 +105,7 @@ More: [docs/browser-demo.md](docs/browser-demo.md#limitations-and-privacy).
 
 ## Project organization
 
-```
+```text
 src/fer_2013/
   data/ training/ evaluation/   download, train (Pydantic config, early stopping), metrics, Grad-CAM++, calibration
   models/                       ResNet18, ONNX export, int8 quantization (needs torch; local only)
@@ -130,7 +130,7 @@ Code is documented in Google-style docstrings (Python) and JSDoc (JavaScript); t
 ```bash
 uv run ruff check --fix . && uv run ruff format .   # lint and format
 uv run mypy                                         # strict type check
-uv run pytest -q                                    # python tests
+uv run pytest -q                                    # Python tests
 npm test --prefix web                               # site tests
 uv run pre-commit install                           # ruff + mypy on commit, tests on push
 ```
