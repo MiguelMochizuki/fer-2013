@@ -3,7 +3,7 @@
 
 Usage:
     uv run python scripts/export_onnx.py \\
-        --checkpoint checkpoints/best.pt --out-dir models/ \\
+        --checkpoint checkpoints/ferplus/best.pt --out-dir models/ \\
         --calibration reports/calibration.json
 """
 

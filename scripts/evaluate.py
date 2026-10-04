@@ -3,8 +3,8 @@
 
 Usage:
     uv run python scripts/evaluate.py \\
-        --checkpoint checkpoints/best.pt \\
-        --processed-dir data/processed \\
+        --checkpoint checkpoints/ferplus/best.pt \\
+        --processed-dir data/processed_ferplus \\
         --split test \\
         --reports-dir reports
 """

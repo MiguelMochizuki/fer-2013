@@ -7,7 +7,7 @@ the predicted class.
 
 Usage:
     uv run python scripts/gradcam_report.py \\
-        --checkpoint checkpoints/best.pt \\
+        --checkpoint checkpoints/ferplus/best.pt \\
         --split test \\
         --reports-dir reports
 """
