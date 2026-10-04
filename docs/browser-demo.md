@@ -10,7 +10,7 @@ How it works:
 - The models are downloaded on first use, checked against their sha256 and kept in the browser cache, so later visits do not download them again.
 - Measured in Chromium on a desktop, with one face: detection about 11 ms, classification about 125 ms, Grad-CAM++ about 4 ms; roughly 100 ms more per extra face. A first visit downloads about 26 MB (the 11 MB model and the 14 MB runtime).
 - PNGs with transparency: the browser's canvas stores premultiplied alpha, so fully transparent pixels reach the model as black, whereas Pillow keeps the stored RGB. Opaque images are unaffected.
-- A JPEG decoded by Chromium gives probabilities that differ from Pillow's by 6e-8 on the example photo, and the same box. Other browsers may decode JPEG slightly differently.
+- A JPEG decoded by Chromium gives probabilities that differ negligibly from Pillow's on the example photo (the golden tests allow 1e-2), and the same box. Other browsers may decode JPEG slightly differently.
 
 Build and run it locally:
 
@@ -25,9 +25,9 @@ The site is published to GitHub Pages from `main` by `.github/workflows/pages.ym
 
 ## Limitations and privacy
 
-- The classifier reaches about 71% accuracy on FER-2013 (see [results](results.md)), its confidences are calibrated on that dataset's validation split only, and it inherits the dataset's biases: acted or web-scraped expressions, uneven demographics, noisy labels. Emotion labels from a face are not a reliable read of how someone feels. Do not use this for decisions about people.
-- The confidence moves with the crop: three copies of the same face in one image got 73.5%, 78.7% and 80.6% (the browser and Python agree on all three), because the detector boxes differ by a few pixels.
-- Faces from a detector are cropped square with a 10% margin before classification. On 1,476 FER test faces upscaled 4x (98% of 1,500 detected), classifying the detector crop scores 68.9% against 69.5% for the original 48x48 image on the same faces, and margins from 0% to 40% all land between 68.6% and 68.9%. So the crop costs about 0.6 points and the margin hardly matters. This is a proxy built from FER faces, not a benchmark on real photos.
+- The classifier reaches about 86% accuracy on the FER+ test labels and 61% on the original FER-2013 labels (see [results](results.md)), its confidences are calibrated on FER+'s validation split only, and it inherits the dataset's biases: acted or web-scraped expressions, uneven demographics, noisy labels. `disgust` and `fear` are rare in training and under-predicted. Emotion labels from a face are not a reliable read of how someone feels. Do not use this for decisions about people.
+- The confidence moves with the crop: copies of the same face in one image get slightly different confidences because the detector boxes differ by a few pixels (the browser and Python agree on each). This was measured with the previous model and not repeated for the current one.
+- Faces from a detector are cropped square with a 10% margin before classification. On the first 1,500 FER+ test faces upscaled 4x (1,480 detected, 98.7%), classifying the detector crop scores 85.2% against 85.3% for the original 48x48 image on the same faces, and margins from 0% to 40% all land between 85.0% and 85.2%. So the crop costs about 0.1 points and the margin hardly matters. This is a proxy built from FER faces (the first 1,500 test images, not a random sample), not a benchmark on real photos.
 - Uploaded images are processed in memory and never written to disk or logged. Uploads are limited to 5 MB and JPEG, PNG or WebP.
 - The service is public and unauthenticated; it caps concurrent work and answers `503` when busy.
 - Neither the API nor the browser demo caps the number of faces: every face the detector finds is classified, so a crowd takes proportionally longer (the browser classifies 16 faces per batch). Detection runs on the image downscaled to at most 640 px on the long side, so small faces in a large crowd photo can be missed.

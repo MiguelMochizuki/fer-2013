@@ -26,9 +26,9 @@ curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
 
 ```bash
  export the trained checkpoint (needs torch), quantize it, and fetch the face detector
-uv run python scripts/export_onnx.py --checkpoint checkpoints/best.pt --out-dir models/
+uv run python scripts/export_onnx.py --checkpoint checkpoints/ferplus/best.pt --out-dir models/ --calibration reports/calibration.json
 mv models/fer_resnet18.onnx models/fer_resnet18_fp32.onnx
-uv run python scripts/quantize_onnx.py --model models/fer_resnet18_fp32.onnx --out models/fer_resnet18.onnx
+uv run python scripts/quantize_onnx.py --model models/fer_resnet18_fp32.onnx --out models/fer_resnet18.onnx --data-dir data/processed_ferplus
 ONLY_YUNET=1 scripts/fetch_models.sh models serving/models.sha256
 MODELS_DIR=models uv run uvicorn fer_2013.serving.api:create_app --factory --port 7860
 ```
@@ -40,7 +40,9 @@ docker build -t fer-api .
 docker run --rm -p 7860:7860 fer-api
 ```
 
-To publish a new model: run `scripts/calibrate.py` and the export with `--calibration`, `gh release create models-vX.Y.Z models/fer_resnet18.onnx models/fer_fc_weight.npy` (model releases use `models-v*` tags so they don't trigger the app's `v*` deploy; bump major when the serving contract changes, such as architecture, input normalization or labels, minor for a retrain, patch for a re-export), append their `sha256sum` lines to `serving/models.sha256`, and point `RELEASE_URL` in the `Dockerfile` at the new tag. CI tests, builds the image and smoke tests it. The image runs anywhere Docker does; the public demo is the [browser build](browser-demo.md), which needs no server.
+To publish a new model: run `scripts/calibrate.py` and the export with `--calibration`, `gh release create models-vX.Y.Z --prerelease models/fer_resnet18.onnx models/fer_resnet18_fp32.onnx models/fer_fc_weight.npy` (model releases use `models-v*` tags so they don't trigger the app's `v*` deploy, and are pre-releases because the Dockerfile, CI and the site download from them), replace the `fer_resnet18.onnx` and `fer_fc_weight.npy` lines of `serving/models.sha256` with their `sha256sum`, and point `RELEASE_URL` in the `Dockerfile` at the new tag. Regenerate the web golden files (`scripts/make_web_golden.py`) and the hardcoded values in `web/tests/npy.test.js`, which depend on the model.
+
+**Versioning.** The serving contract is the model's interface: the input (48x48 grayscale face, preprocessing and normalization), the output names `logits`, `features` and `probs`, the `temperature` metadata, and the class set and order. Changing any of them is a major version. A retrain that keeps the interface is a minor version even when it changes what the predictions mean: `models-v1.3.0` moved from the FER-2013 labels to the FER+ labels, so the same face can get a different emotion than with v1.2, and its release notes say so. A re-export or re-quantization of the same weights is a patch. CI tests, builds the image and smoke tests it. The image runs anywhere Docker does; the public demo is the [browser build](browser-demo.md), which needs no server.
 
 ## Grad-CAM++ without PyTorch
 
@@ -48,15 +50,15 @@ The head is `avgpool -> Dropout -> Linear`, so in eval mode the gradient of a cl
 
 ## Performance
 
-The shipped int8 model scores 70.55% on the full test set through the ONNX Runtime pipeline with the serving preprocessing, against 70.80% for the fp32 ONNX model and 70.74% for PyTorch (see [Quantization](results.md#quantization)).
+The shipped int8 model scores 85.56% on the full FER+ test set through ONNX Runtime, against 85.88% for both the fp32 ONNX model and PyTorch (see [Quantization](results.md#quantization)).
 
 Latency measured with `scripts/benchmark.py` against the Docker image (a 260x260 image with one face; `p50` / `p95` of the full request). On a 12th Gen Intel i5-12450HX with no CPU limit, 60 requests:
 
 | Request            | p50 (ms) | p95 (ms) |
 |--------------------|----------|----------|
-| `explain=false`    | 10.4     | 11.3     |
-| `explain=true`     | 14.5     | 16.3     |
+| `explain=false`    | 12.6     | 13.7     |
+| `explain=true`     | 14.8     | 17.0     |
 
-Restricted to the size of a typical free hosting tier (`docker run --cpus 0.1 --memory 512m`, 15 requests): about 1.3 s p50 without `explain` and 1.6 s with it, a boot of about 33 s, and 94 MiB of memory in use. It fits a 512 MB instance with room to spare. (With the fp32 model and OpenCV it was 1.8 to 2.0 s and 212 MiB.) The detector session is single-threaded on purpose: two ONNX Runtime threads busy-waiting on a tenth of a core made it three times slower.
+Restricted to the size of a typical free hosting tier (`docker run --cpus 0.1 --memory 512m`, 15 requests): about 1.1 s p50 without `explain` and 1.4 s with it (15 requests, so p95 is only indicative: 2.2 s and 1.9 s), a boot of about 25 s, and 92 MiB of memory in use. It fits a 512 MB instance with room to spare. (With the fp32 model and OpenCV it was 1.8 to 2.0 s and 212 MiB.) The detector session is single-threaded on purpose: two ONNX Runtime threads busy-waiting on a tenth of a core made it three times slower.
 
-Classifier alone, one 224x224 image, 2 threads: int8 5.8 ms p50, fp32 17.2 ms, PyTorch 24.1 ms. The Docker image is 365 MB on disk and 94 MB compressed (162 MB of Python packages, 11 MB of models, Python itself and a distroless base for the rest). The base is `gcr.io/distroless/cc-debian12:nonroot`: no shell, no package manager, running as a non-root user; the build copies in the Python runtime and only the shared libraries it needs. It has no OpenCV: YuNet runs on ONNX Runtime with the decoding and NMS in numpy (`serving/detector.py`), and a test checks its boxes against `cv2.FaceDetectorYN`. Together with the int8 model that took the image from 742 MB. An environment with PyTorch and its CUDA wheels is over 4 GB.
+Classifier alone, one 224x224 image, 2 threads: int8 5.3 ms p50, fp32 15.6 ms, PyTorch 23.4 ms. The Docker image is 365 MB on disk and 94 MB compressed (162 MB of Python packages, 11 MB of models, Python itself and a distroless base for the rest). The base is `gcr.io/distroless/cc-debian12:nonroot`: no shell, no package manager, running as a non-root user; the build copies in the Python runtime and only the shared libraries it needs. It has no OpenCV: YuNet runs on ONNX Runtime with the decoding and NMS in numpy (`serving/detector.py`), and a test checks its boxes against `cv2.FaceDetectorYN`. Together with the int8 model that took the image from 742 MB. An environment with PyTorch and its CUDA wheels is over 4 GB.

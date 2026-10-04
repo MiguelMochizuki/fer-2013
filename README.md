@@ -1,4 +1,4 @@
-# FER-2013
+# FER-2013 images, FER+ labels
 
 A ResNet18 that reads seven facial expressions, trained, calibrated, shrunk to 11 MB and running **entirely in your browser**, live from your camera, with a heatmap of where it looked.
 
@@ -11,9 +11,10 @@ A ResNet18 that reads seven facial expressions, trained, calibrated, shrunk to 1
 | | |
 |---|---|
 | **Nothing leaves the tab** | Face detection, classification and Grad-CAM++ run in WebAssembly. Photo or live camera, every face at once. First visit downloads 26 MB. |
-| **Accurate and honest** | 70.6% accuracy, 0.706 macro-F1 on the FER-2013 test set. Confidences are calibrated (ECE 0.168 to 0.022): when it says 90% or more, it is right 94% of the time. |
-| **Small and fast** | int8 quantization took the model from 44.7 MB to 11.3 MB and made it 3x faster for a quarter of a point of accuracy. |
-| **Torch-free API** | FastAPI on ONNX Runtime in a 365 MB distroless image (it was 742 MB): 10 ms per request, 94 MiB of memory. |
+| **Accurate and honest** | 85.6% accuracy, 0.769 macro-F1 on the FER+ test set (the FER-2013 images with crowd-voted labels, [why](docs/results.md#why-fer)). Confidences are calibrated (ECE 0.092 to 0.021): when it says 90% or more, it is right 98% of the time. Rare classes (`disgust`, `fear`) are the weak spot and the results say so. |
+| **Small and fast** | int8 quantization took the model from 44.7 MB to 11.3 MB and made it about 3x faster for a third of a point of accuracy. |
+| **Torch-free API** | FastAPI on ONNX Runtime in a 365 MB distroless image (it was 742 MB): 13 ms per request, 92 MiB of memory. |
+| **Reproducible** | Training is seeded: two runs on the same hardware give identical numbers. Every run records its config, git commit and a hash of each data array. |
 | **Verified, not assumed** | The JavaScript port is tested against golden files from the Python pipeline: resizing is byte-identical to Pillow, detector boxes match OpenCV (IoU 0.999). |
 
 ## Try it
@@ -42,27 +43,33 @@ photo or camera frame
 The same four steps run in Python (`src/fer_2013/serving`) and in JavaScript (`web/src`). Training:
 
 ```bash
-uv run python scripts/download_data.py --csv-path data/raw/                 # needs Kaggle credentials in .env
-uv run python scripts/preprocess_data.py --csv-path data/raw/fer2013.csv --out-dir data/processed/
-uv run python scripts/train.py --config configs/default.yaml                # weighted sampler + loss, early stopping on macro-F1
-uv run python scripts/evaluate.py --checkpoint checkpoints/best.pt --split test
-uv run python scripts/gradcam_report.py --checkpoint checkpoints/best.pt --split test
-uv run python scripts/calibrate.py --checkpoint checkpoints/best.pt         # temperature scaling on the validation split
-uv run python scripts/export_onnx.py --checkpoint checkpoints/best.pt --out-dir models/ --calibration reports/calibration.json
+uv run python scripts/download_data.py --csv-path data/raw/                 # FER-2013 images; needs Kaggle credentials in .env
+curl -L -o data/raw/fer2013new.csv https://raw.githubusercontent.com/microsoft/FERPlus/master/fer2013new.csv   # FER+ labels
+echo "9206e20d62f56475939f516847d61753e4860caeac9718b560129541b776fc2c  data/raw/fer2013new.csv" | sha256sum -c
+uv run python scripts/preprocess_data.py --csv-path data/raw/fer2013.csv --ferplus-csv data/raw/fer2013new.csv --out-dir data/processed_ferplus/
+uv run python scripts/train.py --config configs/default.yaml                # the shipped recipe; writes checkpoints/ferplus/
+uv run python scripts/evaluate.py --checkpoint checkpoints/ferplus/best.pt --processed-dir data/processed_ferplus --split test
+uv run python scripts/gradcam_report.py --checkpoint checkpoints/ferplus/best.pt --processed-dir data/processed_ferplus --split test
+uv run python scripts/calibrate.py --checkpoint checkpoints/ferplus/best.pt --processed-dir data/processed_ferplus   # temperature scaling on the validation split
+uv run python scripts/export_onnx.py --checkpoint checkpoints/ferplus/best.pt --out-dir models/ --calibration reports/calibration.json
 mv models/fer_resnet18.onnx models/fer_resnet18_fp32.onnx
-uv run python scripts/quantize_onnx.py --model models/fer_resnet18_fp32.onnx --out models/fer_resnet18.onnx
+uv run python scripts/quantize_onnx.py --model models/fer_resnet18_fp32.onnx --out models/fer_resnet18.onnx --data-dir data/processed_ferplus
 ```
+
+Each run writes its checkpoints to `checkpoints/<run name>/` and a `reports/history_*.json` with the config, the git commit and a sha256 per data array. The seed is fixed and cuDNN is deterministic, so the same hardware gives the same run to the digit (another GPU or driver can differ slightly). `configs/fer2013.yaml` is the recipe of the previous model, on the original labels.
 
 Override any config value with `--set section.field=value` (see `configs/default.yaml`).
 
 ## Results
 
-| | Test accuracy | Macro-F1 | ECE | Size | One image |
+| | FER+ test accuracy | Macro-F1 | ECE | Size | One image |
 |---|---|---|---|---|---|
-| fp32 | 0.708 | 0.710 | 0.023 | 44.7 MB | 17.2 ms |
-| **int8 (shipped)** | **0.706** | **0.706** | **0.021** | **11.3 MB** | **5.8 ms** |
+| fp32 | 0.859 | 0.770 | 0.021 | 44.7 MB | 15.6 ms |
+| **int8 (shipped)** | **0.856** | **0.769** | **0.015** | **11.3 MB** | **5.3 ms** |
 
-`happy` (F1 0.89) and `surprise` (0.81) are read well; `sad` (0.55) and `fear` (0.59) are the weak spots, mostly confused with `neutral` and `angry`. Temperature scaling (T = 2.40, fitted on validation only) cut the expected calibration error from 0.168 to 0.022 without changing a single prediction.
+`happy` (F1 0.94), `neutral` (0.87) and `surprise` (0.87) are read well; `disgust` (0.55, only 28 test images) and `fear` (0.59) are the weak spots: rare in training and under-predicted, `fear` mostly taken for `surprise`. Temperature scaling (T = 0.674, fitted on validation only; this model is under-confident) cut the expected calibration error from 0.092 to 0.021 without changing a single prediction.
+
+**Why FER+ labels.** FER+ re-labels the FER-2013 images by a vote of about 10 annotators, and only about 65% of its labels equal the original ones (17% for `fear`). On the original FER-2013 test labels this model scores 61.2%, and the previous model, trained on them, 70.7%: different targets, so the two numbers are not comparable. [The comparison, the paper's 84 to 85% and the recipe that got there](docs/results.md#why-fer).
 
 <p>
 <img src="docs/images/confusion_matrix.png" width="49%" alt="Confusion matrix on the test set">
@@ -89,7 +96,7 @@ One result per detected face: box, emotion, calibrated probabilities and, with `
 
 ## Limitations and privacy
 
-- About 71% accuracy on an acted, noisy dataset. Emotion labels read off a face are not a reliable read of how someone feels: do not use this for decisions about people.
+- About 86% accuracy on FER+ labels, 61% on the original FER-2013 labels, over acted and web-scraped faces with noisy annotations; `disgust` and `fear` are under-predicted. Emotion labels read off a face are not a reliable read of how someone feels: do not use this for decisions about people.
 - The model was trained on 48x48 grayscale faces. A webcam in poor light or at an angle is read worse than the test set suggests, and `neutral` tends to win.
 - Confidences move a few points with a few pixels of crop. Small faces in a large crowd photo can be missed (detection runs at up to 640 px).
 - Uploads are processed in memory and never written to disk or logged; the browser demo sends nothing anywhere. The page is under a strict CSP; the worker that touches the pixels is same-origin code with no network calls, but GitHub Pages cannot send CSP headers for workers, so the browser does not enforce that part.
@@ -114,7 +121,7 @@ serving/models.sha256           pinned hashes of every model the image and the s
 
 ## Releases
 
-`v*` tags are the application; `models-v*` tags are the trained weights, published as **pre-releases on purpose**: the Dockerfile, CI and the site download from them, so they must stay. Model versions: major for a contract change, minor for a retrain or re-quantization, patch for a re-export.
+`v*` tags are the application; `models-v*` tags are the trained weights, published as **pre-releases on purpose**: the Dockerfile, CI and the site download from them, so they must stay. Model versions: major for a contract change (a different input, preprocessing, output name or class set or order), minor for a retrain or re-quantization (the meaning of the labels can change, as it did in v1.3.0: say so in the release notes), patch for a re-export.
 
 ## Development
 
@@ -130,4 +137,4 @@ uv run pre-commit install                           # ruff + mypy on commit, tes
 
 ## License
 
-[MIT](LICENSE) from v0.2.0 (v0.1.0 and v0.1.1 were published under the AGPL-3.0 and stay under it). The data is the [FER-2013 mirror on Kaggle](https://www.kaggle.com/datasets/deadskull7/fer2013) (CC0); third-party attributions are in [NOTICE](NOTICE).
+[MIT](LICENSE) from v0.2.0 (v0.1.0 and v0.1.1 were published under the AGPL-3.0 and stay under it). The images are the [FER-2013 mirror on Kaggle](https://www.kaggle.com/datasets/deadskull7/fer2013) (CC0) and the labels are [FER+](https://github.com/microsoft/FERPlus) (Microsoft, MIT; Barsoum et al., ICMI 2016); third-party attributions are in [NOTICE](NOTICE).
