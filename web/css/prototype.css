@@ -1,0 +1,62 @@
+/* PROTOTYPE: layout variants for the result state. Throwaway. Switch with ?variant=A|B|C|D|E.
+   A is the current layout (no overrides). Below 900px every variant is the current layout. */
+
+.proto-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 999px; background: #14171c; color: #f4f6f8; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); font: 600 0.875rem/1 var(--sans); }
+.proto-bar button { width: 36px; height: 36px; border: 0; border-radius: 999px; background: #2a2f37; color: inherit; font: inherit; cursor: pointer; }
+.proto-bar button:active { transform: scale(0.94); }
+.proto-bar output { min-width: 150px; text-align: center; }
+
+@media (min-width: 900px) {
+  /* ---------- B: band. The photo on top, as wide as it likes; the readout runs in one row under it ---------- */
+  html[data-variant="B"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "intro" "stage" "results" "note";
+    gap: 20px;
+  }
+  html[data-variant="B"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .stage { position: static; }
+  html[data-variant="B"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .photo { display: inline-block; max-width: 100%; vertical-align: top; }
+  html[data-variant="B"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .photo canvas { width: auto; height: auto; max-width: 100%; max-height: 48vh; }
+  html[data-variant="B"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .results { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr); gap: 0 48px; align-items: start; }
+  html[data-variant="B"] .results .strip { grid-column: 1 / -1; }
+  html[data-variant="B"] .results :is(.faces, .face) { display: contents; }
+  html[data-variant="B"] .results .words { grid-column: 1; --r: clamp(2.75rem, 6vw, 5.5rem); }
+  html[data-variant="B"] .results .views { grid-column: 2; margin-top: 0; }
+  html[data-variant="B"] .results .timings { grid-column: 3; flex-direction: column; border-top: 0; padding-top: 0; }
+
+  /* ---------- C: diptych. The word is the headline; the photo and where the model looked share the width ---------- */
+  html[data-variant="C"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: "intro intro" "words words" "stage views" "strip timings" "note note";
+    gap: 20px 40px; align-items: start;
+  }
+  html[data-variant="C"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .stage { position: static; }
+  html[data-variant="C"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .results { display: contents; }
+  html[data-variant="C"] .results :is(.faces, .face) { display: contents; }
+  html[data-variant="C"] .results .words { grid-area: words; --r: clamp(3.5rem, 10vw, 8.5rem); }
+  html[data-variant="C"] .results .views { grid-area: views; display: block; margin: 0; }
+  html[data-variant="C"] .results .view canvas { width: auto; height: min(46vh, 100%); max-width: 100%; }
+  html[data-variant="C"] .results .view:first-child { display: none; }
+  html[data-variant="C"] .results .strip { grid-area: strip; margin: 0; }
+  html[data-variant="C"] .results .timings { grid-area: timings; border-top: 0; padding-top: 0; justify-content: flex-end; align-self: start; }
+
+  /* ---------- D: rail. Controls become a narrow left rail, the photo takes the middle, the reading its own column ---------- */
+  html[data-variant="D"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) {
+    grid-template-columns: 188px minmax(0, 1fr) 340px;
+    grid-template-areas: "intro stage results" "note note note";
+    gap: 16px 40px; align-items: start; padding-top: 16px;
+  }
+  html[data-variant="D"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  html[data-variant="D"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .btn { width: 100%; text-align: left; padding: 0 14px; }
+  html[data-variant="D"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .btn-quiet { padding: 0 2px; }
+  html[data-variant="D"] .results .words { --r: clamp(2.5rem, 4.5vw, 4.5rem); }
+  html[data-variant="D"] .results .views { grid-template-columns: 1fr; }
+
+  /* ---------- E: compact readout. Same split as A, but the whole answer fits in one screen:
+     word on top, then crop, heatmap and timings in a single row ---------- */
+  html[data-variant="E"] #app:is([data-state="loading"], [data-state="analyzing"], [data-state="result"], [data-state="live"]) .results { display: grid; grid-template-columns: 150px 150px minmax(0, 1fr); gap: 0 14px; align-items: end; align-content: start; }
+  html[data-variant="E"] .results .strip { grid-column: 1 / -1; }
+  html[data-variant="E"] .results :is(.faces, .face) { display: contents; }
+  html[data-variant="E"] .results .words { grid-column: 1 / -1; margin-bottom: 20px; }
+  html[data-variant="E"] .results .views { display: contents; }
+  html[data-variant="E"] .results .timings { grid-column: 3; flex-direction: column; border-top: 0; padding: 0 0 26px 12px; gap: 6px; }
+}
