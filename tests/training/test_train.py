@@ -288,3 +288,17 @@ def test_history_json_records_provenance(tmp_path: Path) -> None:
 
     path = save_history(TrainHistory(), tmp_path, {"git": "abc123", "config": {}})
     assert json.loads(path.read_text())["provenance"]["git"] == "abc123"
+
+
+def test_same_seed_builds_the_same_model_head() -> None:
+    from fer_2013.models.cnn import build_resnet18
+    from fer_2013.training.train import seed_everything
+
+    def head() -> torch.Tensor:
+        model = build_resnet18(num_classes=7, pretrained=False)
+        return torch.cat([p.flatten() for p in model.fc.parameters()])
+
+    seed_everything(42)
+    first = head()
+    seed_everything(42)
+    assert torch.equal(first, head())

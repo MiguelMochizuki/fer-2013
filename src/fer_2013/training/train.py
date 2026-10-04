@@ -171,6 +171,20 @@ def save_checkpoint(
     )
 
 
+def seed_everything(seed: int) -> None:
+    """Seed python, numpy and torch and make cuDNN deterministic.
+
+    Call it before building the model: the new classifier head is initialised from
+    the global RNG. Same seed and hardware give the same run; other GPUs or drivers
+    may still differ.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
 def _provenance(config: Config) -> dict[str, object]:
     """What produced a run: config, git commit and a sha256 per data array."""
     try:
@@ -234,12 +248,7 @@ def fit(
     """Run the training loop. Saves best + last checkpoints and history."""
     tcfg = config.training
     n_classes = config.model.num_classes
-    random.seed(tcfg.seed)
-    np.random.seed(tcfg.seed)
-    torch.manual_seed(tcfg.seed)
-    # Same seed and hardware give the same run; other GPUs or drivers may still differ.
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    seed_everything(tcfg.seed)
     device = torch.device(config.device)
     model.to(device)
 
@@ -379,5 +388,6 @@ __all__ = [
     "fit",
     "save_checkpoint",
     "save_history",
+    "seed_everything",
     "train_one_epoch",
 ]
