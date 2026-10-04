@@ -83,7 +83,7 @@ Per-class numbers, Grad-CAM++ examples, the overfitting analysis, calibration an
 - **The int8 model that was wrong only on some CPUs.** The first quantization looked perfect on my machine and was off by 0.26 in probability on a GitHub runner: AVX2 CPUs without VNNI saturate an int16 intermediate. A golden-file test caught it; a 7-bit range makes the results bit-identical on both. [Details](docs/results.md#quantization).
 - **OpenCV out of the image.** YuNet's decoding and NMS are a few dozen lines of numpy, tested against `cv2.FaceDetectorYN`. The same algorithm powers the browser detector.
 - **Closed-form Grad-CAM++.** The head is `avgpool -> dropout -> linear`, so the gradients are constant over space and the heatmap needs only the activations and the weights. [Why it works](docs/api.md#grad-cam-without-pytorch).
-- **Live camera.** A tracker keeps face numbers between frames and smooths probabilities with an exponential average, because the classifier moves a few points with a few pixels of crop. [Browser demo](docs/browser-demo.md).
+- **Live camera.** A tracker keeps face numbers between frames and smooths probabilities with an exponential average, because the confidence can move with a few pixels of crop (up to 29 points in the worst case measured). [Browser demo](docs/browser-demo.md).
 - **Free, permanent hosting.** The demo is a static site on GitHub Pages; there is no server to pay for or to keep alive.
 
 ## API
@@ -98,7 +98,7 @@ One result per detected face: box, emotion, calibrated probabilities and, with `
 
 - About 86% accuracy on FER+ labels, 61% on the original FER-2013 labels, over acted and web-scraped faces with noisy annotations; `disgust` and `fear` are under-predicted. Emotion labels read off a face are not a reliable read of how someone feels: do not use this for decisions about people.
 - The model was trained on 48x48 grayscale faces. A webcam in poor light or at an angle is read worse than the test set suggests, and `neutral` tends to win.
-- Confidences move a few points with a few pixels of crop. Small faces in a large crowd photo can be missed (detection runs at up to 640 px).
+- Confidences move with the crop: on upscaled test faces a 2 px shift of the box changes the top confidence by 0.2 points on average and by up to 29 in the worst case. Small faces in a large crowd photo can be missed (detection runs at up to 640 px).
 - Uploads are processed in memory and never written to disk or logged; the browser demo sends nothing anywhere. The page is under a strict CSP; the worker that touches the pixels is same-origin code with no network calls, but GitHub Pages cannot send CSP headers for workers, so the browser does not enforce that part.
 
 More: [docs/browser-demo.md](docs/browser-demo.md#limitations-and-privacy).
