@@ -1,3 +1,5 @@
+"""Smoke test that the reliability diagram is written to disk."""
+
 from pathlib import Path
 
 import numpy as np

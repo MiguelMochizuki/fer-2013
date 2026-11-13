@@ -1,3 +1,5 @@
+"""Tests for temperature scaling and the calibration metrics (ECE, NLL, Brier, reliability bins) on synthetic logits with a known temperature."""
+
 import numpy as np
 import pytest
 

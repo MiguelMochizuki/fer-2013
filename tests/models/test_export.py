@@ -1,3 +1,5 @@
+"""Tests for the ONNX export: output names and shapes, the calibrated `probs` output, temperature validation, and that a failed parity check leaves no file behind."""
+
 from pathlib import Path
 
 import numpy as np

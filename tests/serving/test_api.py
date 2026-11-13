@@ -1,3 +1,5 @@
+"""Tests for the FastAPI app with a fake detector: response shape, `explain`, upload limits (413), unreadable images (422) and the concurrency limit (503)."""
+
 import base64
 import io
 import threading

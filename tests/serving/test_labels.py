@@ -1,3 +1,5 @@
+"""Test that the serving emotion labels match the training order."""
+
 from fer_2013.evaluation.evaluate import EMOTION_LABELS
 from fer_2013.serving.labels import EMOTIONS
 

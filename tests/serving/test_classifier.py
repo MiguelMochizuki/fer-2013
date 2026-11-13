@@ -1,3 +1,5 @@
+"""Tests that the ONNX `Classifier` matches PyTorch, accepts any batch size and uses the calibrated `probs` output when the model has one."""
+
 from pathlib import Path
 
 import numpy as np

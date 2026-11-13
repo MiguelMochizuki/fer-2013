@@ -1,6 +1,6 @@
 # Contributing
 
-Setup and the daily commands are in the [README](README.md#development). CI runs the same checks as the pre-commit hooks (ruff, mypy, pytest, `npm test --prefix web`), so a green local run means a green PR.
+Setup and the daily commands are in the [README](README.md#tests-and-checks). CI runs the same checks as the pre-commit hooks (ruff, mypy, pytest, `npm test --prefix web`), so a green local run means a green PR.
 
 ## Documentation Conventions
 

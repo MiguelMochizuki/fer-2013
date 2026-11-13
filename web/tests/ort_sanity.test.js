@@ -1,3 +1,7 @@
+/**
+ * Sanity check that onnxruntime-web runs the classifier on Node's WASM backend and returns three outputs.
+ * Skipped unless `models/fer_resnet18.onnx` exists.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";

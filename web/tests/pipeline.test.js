@@ -1,3 +1,7 @@
+/**
+ * Tests that the whole browser pipeline reproduces Python on the fixture photos (golden `analyze.json`): faces, `explain`, many faces, alpha and timings.
+ * Skipped unless all three models are in `models/`.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";

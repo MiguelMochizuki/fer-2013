@@ -1,3 +1,6 @@
+/**
+ * Tests that resizing and RGB-to-gray match Pillow: byte-identical for uint8, within 1e-4 for float32.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";

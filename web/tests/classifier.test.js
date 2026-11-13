@@ -1,3 +1,7 @@
+/**
+ * Tests that the WASM classifier matches the Python probabilities and features (golden files), batches consistently and keeps the training class order.
+ * Skipped unless `models/fer_resnet18.onnx` exists.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";

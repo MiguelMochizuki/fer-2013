@@ -1,3 +1,5 @@
+"""Shared fixtures: an untrained seeded ResNet18 and its exported ONNX files, built once per session."""
+
 from pathlib import Path
 
 import pytest

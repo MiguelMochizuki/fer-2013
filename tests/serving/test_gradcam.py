@@ -1,3 +1,5 @@
+"""Tests for the closed-form Grad-CAM++: degenerate inputs, the overlay PNG, and parity with `pytorch_grad_cam` (also on the trained checkpoint, marked `slow`)."""
+
 import base64
 import io
 from pathlib import Path

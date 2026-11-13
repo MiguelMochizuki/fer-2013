@@ -1,3 +1,6 @@
+/**
+ * Tests for the square crop and the 224x224 input plane against the Python golden files, including clamping at the borders.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

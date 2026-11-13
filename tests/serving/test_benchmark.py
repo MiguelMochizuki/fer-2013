@@ -1,3 +1,5 @@
+"""Tests for the percentile helper of `scripts/benchmark.py`."""
+
 import importlib.util
 from pathlib import Path
 

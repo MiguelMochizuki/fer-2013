@@ -1,3 +1,8 @@
+"""Tests for the numpy YuNet detector: boxes on a real face, odd image sizes, thread safety, no OpenCV import in serving, and parity with `cv2.FaceDetectorYN`.
+
+Skipped unless the YuNet model is in `models/`.
+"""
+
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor

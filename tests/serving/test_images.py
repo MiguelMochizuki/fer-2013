@@ -1,3 +1,5 @@
+"""Tests for upload decoding: the size limit, non-image and truncated files, decompression bombs, EXIF rotation and pixel modes."""
+
 import io
 import warnings
 

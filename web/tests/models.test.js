@@ -1,3 +1,6 @@
+/**
+ * Tests for the model loader with a fake `fetch` and cache: progress, sha256 verification, cache hits, corrupted entries and download errors.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
