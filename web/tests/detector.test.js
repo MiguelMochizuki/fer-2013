@@ -1,3 +1,7 @@
+/**
+ * Tests for the YuNet port: head decoding, NMS, padding and scaling, and agreement with OpenCV on real images.
+ * The detect tests are skipped unless the YuNet model is in `models/`.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";

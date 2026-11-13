@@ -1,3 +1,7 @@
+/**
+ * Tests that Grad-CAM++ and the overlay match the Python golden files, with no NaN on zero features.
+ * The map tests are skipped unless `models/fer_fc_weight.npy` exists.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";

@@ -1,3 +1,6 @@
+/**
+ * Tests for the pure view helpers: upload validation, probability ranking and byte formatting.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { formatBytes, rankProbabilities, validateFile } from "../src/view.js";

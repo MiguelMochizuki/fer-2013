@@ -1,3 +1,5 @@
+"""Tests for the ASGI limits: the body limit stops reading early and a busy request is rejected before its body is read."""
+
 import asyncio
 import threading
 

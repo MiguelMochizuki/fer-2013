@@ -1,3 +1,5 @@
+"""Test that the golden files used by the site tests are what `scripts/make_web_golden.py` generates now, so the JavaScript port is never checked against a stale reference."""
+
 import importlib.util
 from pathlib import Path
 from types import ModuleType

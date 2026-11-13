@@ -2,9 +2,44 @@
 
 A ResNet18 that reads seven facial expressions, trained, calibrated, shrunk to 11 MB and running **entirely in your browser**, live from your camera, with a heatmap of where it looked.
 
-**[Live demo](https://miguelmochizuki.github.io/fer-2013/)** · [API](#api) · [Results](#results) · [Limitations](#limitations-and-privacy)
+**[Live demo](https://miguelmochizuki.github.io/fer-2013/)** · [API](#api) · [Results](#key-outputs--reports) · [Limitations](#limitations-and-privacy)
+
+**Contents:** [Overview](#overview) · [Highlights](#highlights) · [Quick Start](#quick-start) · [Project Organization](#project-organization) · [Main Tools & Stack](#main-tools--stack) · [Usage](#usage) · [Key Outputs & Reports](#key-outputs--reports) · [Documentation Conventions](#documentation-conventions) · [Contributing](#contributing) · [License](#license)
 
 ![The live demo, step by step: the sample photo is analyzed and read as happy with its crop and Grad-CAM++ heatmap, then a photo with four faces is analyzed and face 3 is selected](docs/images/demo.gif)
+
+## Overview
+
+### How it works
+
+```text
+photo or camera frame
+  -> YuNet face detector (230 KB, ONNX)
+  -> square crop with 10% margin, grayscale, 224x224
+  -> ResNet18, int8 (ONNX): logits, layer4 features, calibrated probabilities
+  -> Grad-CAM++ from the features and the final layer's weights (closed form, no autograd)
+```
+
+The same four steps run in Python (`src/fer_2013/serving`) and in JavaScript (`web/src`).
+
+The same four steps run in Python (`src/fer_2013/serving`) and in JavaScript (`web/src`).
+
+### Engineering notes
+
+- **The int8 model that was wrong only on some CPUs.** The first quantization looked perfect on my machine and was off by 0.26 in probability on a GitHub runner: AVX2 CPUs without VNNI saturate an int16 intermediate. A golden-file test caught it; a 7-bit range makes the results bit-identical on both. [Details](docs/results.md#quantization).
+- **OpenCV out of the image.** YuNet's decoding and NMS are a few dozen lines of numpy, tested against `cv2.FaceDetectorYN`. The same algorithm powers the browser detector.
+- **Closed-form Grad-CAM++.** The head is `avgpool -> dropout -> linear`, so the gradients are constant over space and the heatmap needs only the activations and the weights. [Why it works](docs/api.md#grad-cam-without-pytorch).
+- **Live camera.** A tracker keeps face numbers between frames and smooths probabilities with an exponential average, because the confidence can move with a few pixels of crop (up to 29 points in the worst case measured). [Browser demo](docs/browser-demo.md).
+- **Free, permanent hosting.** The demo is a static site on GitHub Pages; there is no server to pay for or to keep alive.
+
+### Limitations and privacy
+
+- About 86% accuracy on FER+ labels, 61% on the original FER-2013 labels, over acted and web-scraped faces with noisy annotations; `disgust` and `fear` are under-predicted. Emotion labels read off a face are not a reliable read of how someone feels: do not use this for decisions about people.
+- The model was trained on 48x48 grayscale faces. A webcam in poor light or at an angle is read worse than the test set suggests, and `neutral` tends to win.
+- Confidences move with the crop: on upscaled test faces a 2 px shift of the box changes the top confidence by 0.2 points on average and by up to 29 in the worst case. Small faces in a large crowd photo can be missed (detection runs at up to 640 px).
+- Uploads are processed in memory and never written to disk or logged; the browser demo sends nothing anywhere. The page is under a strict CSP; the worker that touches the pixels is same-origin code with no network calls, but GitHub Pages cannot send CSP headers for workers, so the browser does not enforce that part.
+
+More: [docs/browser-demo.md](docs/browser-demo.md#limitations-and-privacy).
 
 ## Highlights
 
@@ -17,7 +52,7 @@ A ResNet18 that reads seven facial expressions, trained, calibrated, shrunk to 1
 | **Reproducible** | Training is seeded: two runs on the same hardware give identical numbers. Every run records its config, git commit and a hash of each data array. |
 | **Verified, not assumed** | The JavaScript port is tested against golden files from the Python pipeline: resizing is byte-identical to Pillow, detector boxes match OpenCV (IoU 0.999). |
 
-## Try it
+## Quick Start
 
 ```bash
 # in the browser: https://miguelmochizuki.github.io/fer-2013/
@@ -30,17 +65,85 @@ curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
 uv sync
 ```
 
-## How it works
+## Project Organization
 
 ```text
-photo or camera frame
-  -> YuNet face detector (230 KB, ONNX)
-  -> square crop with 10% margin, grayscale, 224x224
-  -> ResNet18, int8 (ONNX): logits, layer4 features, calibrated probabilities
-  -> Grad-CAM++ from the features and the final layer's weights (closed form, no autograd)
+fer-2013/
+├── configs/       # training recipes (YAML)
+│   ├── default.yaml
+│   └── fer2013.yaml
+├── docs/          # results, API and browser-demo deep dives
+│   ├── images/
+│   ├── api.md
+│   ├── browser-demo.md
+│   └── results.md
+├── scripts/       # thin CLIs over the package
+│   ├── benchmark.py
+│   ├── calibrate.py
+│   ├── download_data.py
+│   ├── evaluate.py
+│   ├── export_onnx.py
+│   ├── fetch_models.sh
+│   ├── gradcam_report.py
+│   ├── make_web_golden.py
+│   ├── preprocess_data.py
+│   ├── quantize_onnx.py
+│   ├── smoke_test.sh
+│   └── train.py
+├── serving/       # pinned sha256 of every downloaded model
+│   └── models.sha256
+├── src/
+│   └── fer_2013/  # the package: data, training, evaluation, models, serving
+├── tests/         # pytest
+│   ├── evaluation/
+│   ├── serving/
+│   ├── training/
+│   ├── web/
+│   └── conftest.py
+├── web/           # static browser demo (ES modules, worker)
+│   ├── css/
+│   ├── examples/
+│   ├── fonts/
+│   ├── icons/
+│   ├── licenses/
+│   ├── scripts/
+│   ├── src/
+│   ├── tests/     # node:test, against Python golden files
+│   ├── build.mjs
+│   ├── index.html
+│   ├── package-lock.json
+│   └── package.json
+├── .dockerignore
+├── .env.example
+├── .gitignore
+├── .pre-commit-config.yaml
+├── .python-version
+├── CONTRIBUTING.md
+├── Dockerfile
+├── LICENSE
+├── NOTICE
+├── pyproject.toml
+├── README.md
+└── uv.lock
 ```
 
-The same four steps run in Python (`src/fer_2013/serving`) and in JavaScript (`web/src`). Training:
+### Key modules
+
+- `src/fer_2013/data`, `training`, `evaluation`: download, train (Pydantic config, early stopping), metrics, Grad-CAM++, calibration.
+- `src/fer_2013/models`: ResNet18, ONNX export, int8 quantization (needs torch; local only).
+- `src/fer_2013/serving`: torch-free runtime: preprocess, YuNet, classifier, Grad-CAM++, FastAPI.
+- `web/`: the static site; its tests run against golden files generated by the Python pipeline (`scripts/make_web_golden.py`).
+- `notebooks/`: EDA, test-set analysis, Grad-CAM. `.github/`: CI, Pages workflow and release notes.
+
+## Main Tools & Stack
+
+**Stack:** Python 3.12 and [uv](https://docs.astral.sh/uv/), PyTorch (training only), ONNX Runtime, FastAPI, OpenCV (tests only), Docker (distroless), onnxruntime-web, GitHub Actions and Pages.
+
+## Usage
+
+### Train
+
+Training, step by step:
 
 ```bash
 uv run python scripts/download_data.py --csv-path data/raw/                 # FER-2013 images; needs Kaggle credentials in .env
@@ -60,7 +163,29 @@ Each run writes its checkpoints to `checkpoints/<run name>/` and a `reports/hist
 
 Override any config value with `--set section.field=value` (see `configs/default.yaml`).
 
-## Results
+### API
+
+```bash
+curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
+```
+
+One result per detected face: box, emotion, calibrated probabilities and, with `explain=true`, a base64 Grad-CAM++ PNG. `GET /` is a demo page, `GET /docs` the OpenAPI UI, `GET /health` the loaded model hash. Run it without Docker, response format, latency tables: [docs/api.md](docs/api.md).
+
+### Tests and checks
+
+```bash
+uv run ruff check --fix . && uv run ruff format .   # lint and format
+uv run mypy                                         # strict type check
+uv run pytest -q                                    # Python tests
+npm test --prefix web                               # site tests
+uv run pre-commit install                           # ruff + mypy on commit, tests on push
+```
+
+### Releases
+
+`v*` tags are the application; `models-v*` tags are the trained weights, published as **pre-releases on purpose**: the Dockerfile, CI and the site download from them, so they must stay. Model versions: major for a contract change (a different input, preprocessing, output name or class set or order), minor for a retrain or re-quantization (the meaning of the labels can change, as it did in v1.3.0: say so in the release notes), patch for a re-export.
+
+## Key Outputs & Reports
 
 | Model | FER+ test accuracy | Macro-F1 | ECE | Size | One image |
 |---|---|---|---|---|---|
@@ -78,62 +203,13 @@ Override any config value with `--set section.field=value` (see `configs/default
 
 Per-class numbers, Grad-CAM++ examples, the overfitting analysis, calibration and quantization details: [docs/results.md](docs/results.md).
 
-## Engineering notes
+## Documentation Conventions
 
-- **The int8 model that was wrong only on some CPUs.** The first quantization looked perfect on my machine and was off by 0.26 in probability on a GitHub runner: AVX2 CPUs without VNNI saturate an int16 intermediate. A golden-file test caught it; a 7-bit range makes the results bit-identical on both. [Details](docs/results.md#quantization).
-- **OpenCV out of the image.** YuNet's decoding and NMS are a few dozen lines of numpy, tested against `cv2.FaceDetectorYN`. The same algorithm powers the browser detector.
-- **Closed-form Grad-CAM++.** The head is `avgpool -> dropout -> linear`, so the gradients are constant over space and the heatmap needs only the activations and the weights. [Why it works](docs/api.md#grad-cam-without-pytorch).
-- **Live camera.** A tracker keeps face numbers between frames and smooths probabilities with an exponential average, because the confidence can move with a few pixels of crop (up to 29 points in the worst case measured). [Browser demo](docs/browser-demo.md).
-- **Free, permanent hosting.** The demo is a static site on GitHub Pages; there is no server to pay for or to keep alive.
+Google-style docstrings (Python) and JSDoc (JavaScript); the rules and examples are in [CONTRIBUTING.md](CONTRIBUTING.md#documentation-conventions).
 
-## API
+## Contributing
 
-```bash
-curl -F "file=@photo.jpg" "http://localhost:7860/predict?explain=true"
-```
-
-One result per detected face: box, emotion, calibrated probabilities and, with `explain=true`, a base64 Grad-CAM++ PNG. `GET /` is a demo page, `GET /docs` the OpenAPI UI, `GET /health` the loaded model hash. Run it without Docker, response format, latency tables: [docs/api.md](docs/api.md).
-
-## Limitations and privacy
-
-- About 86% accuracy on FER+ labels, 61% on the original FER-2013 labels, over acted and web-scraped faces with noisy annotations; `disgust` and `fear` are under-predicted. Emotion labels read off a face are not a reliable read of how someone feels: do not use this for decisions about people.
-- The model was trained on 48x48 grayscale faces. A webcam in poor light or at an angle is read worse than the test set suggests, and `neutral` tends to win.
-- Confidences move with the crop: on upscaled test faces a 2 px shift of the box changes the top confidence by 0.2 points on average and by up to 29 in the worst case. Small faces in a large crowd photo can be missed (detection runs at up to 640 px).
-- Uploads are processed in memory and never written to disk or logged; the browser demo sends nothing anywhere. The page is under a strict CSP; the worker that touches the pixels is same-origin code with no network calls, but GitHub Pages cannot send CSP headers for workers, so the browser does not enforce that part.
-
-More: [docs/browser-demo.md](docs/browser-demo.md#limitations-and-privacy).
-
-## Project organization
-
-```text
-src/fer_2013/
-  data/ training/ evaluation/   download, train (Pydantic config, early stopping), metrics, Grad-CAM++, calibration
-  models/                       ResNet18, ONNX export, int8 quantization (needs torch; local only)
-  serving/                      torch-free runtime: preprocess, YuNet, classifier, Grad-CAM++, FastAPI
-web/                            the static site: ES modules, worker, tests against Python golden files
-scripts/                        thin CLIs over the package; fetch_models.sh, smoke_test.sh
-tests/  web/tests/              pytest and node:test (the site is tested against Python golden files)
-docs/                           results, API and browser-demo deep dives
-serving/models.sha256           pinned hashes of every model the image and the site download
-```
-
-**Stack:** Python 3.12 and [uv](https://docs.astral.sh/uv/), PyTorch (training only), ONNX Runtime, FastAPI, OpenCV (tests only), Docker (distroless), onnxruntime-web, GitHub Actions and Pages.
-
-## Releases
-
-`v*` tags are the application; `models-v*` tags are the trained weights, published as **pre-releases on purpose**: the Dockerfile, CI and the site download from them, so they must stay. Model versions: major for a contract change (a different input, preprocessing, output name or class set or order), minor for a retrain or re-quantization (the meaning of the labels can change, as it did in v1.3.0: say so in the release notes), patch for a re-export.
-
-## Development
-
-Code is documented in Google-style docstrings (Python) and JSDoc (JavaScript); the rules and examples are in [CONTRIBUTING.md](CONTRIBUTING.md).
-
-```bash
-uv run ruff check --fix . && uv run ruff format .   # lint and format
-uv run mypy                                         # strict type check
-uv run pytest -q                                    # Python tests
-npm test --prefix web                               # site tests
-uv run pre-commit install                           # ruff + mypy on commit, tests on push
-```
+CI runs the same checks as the pre-commit hooks (ruff, mypy, pytest, `npm test --prefix web`); see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

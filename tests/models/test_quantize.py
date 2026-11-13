@@ -1,3 +1,8 @@
+"""Tests for int8 quantization: the model keeps the contract and shrinks, and `verify_quantized` accepts a good model and rejects an impossible bar.
+
+Skipped unless the fp32 model and `data/processed` exist locally.
+"""
+
 from pathlib import Path
 
 import numpy as np

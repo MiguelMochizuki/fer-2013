@@ -1,3 +1,5 @@
+"""Tests that serving preprocessing matches the training transforms, and for the square crop (clamping, borders, empty boxes)."""
+
 import numpy as np
 import pytest
 import torch

@@ -1,3 +1,6 @@
+/**
+ * Tests for `build.mjs`: the dist layout, hashed model names, a relative-path manifest, the golden hash check and the output directory guard.
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
